@@ -566,10 +566,10 @@
       }
 
       /* total */
-      tot.innerHTML = '';
-      tot.appendChild(K.nodo('<div class="op-total__fila"><span>Cobra</span><b>' + K.esc(pesos(liq.cobro)) + '</b></div>' +
+      /* K.nodo devuelve un solo elemento: las tres filas van directo por innerHTML */
+      tot.innerHTML = '<div class="op-total__fila"><span>Cobra</span><b>' + K.esc(pesos(liq.cobro)) + '</b></div>' +
         '<div class="op-total__fila"><span>Descuentos</span><b>− ' + K.esc(pesos(liq.retenido)) + '</b></div>' +
-        '<div class="op-total__fila op-total__neto"><span>Valor a girar</span><b>' + K.esc(pesos(liq.neto)) + '</b></div>'));
+        '<div class="op-total__fila op-total__neto"><span>Valor a girar</span><b>' + K.esc(pesos(liq.neto)) + '</b></div>';
       if (liq.neto < 0) tot.appendChild(K.nodo('<p class="op-nota op-nota--malo">' + K.icono('aviso', 14) + ' Los descuentos pasan el valor de la cuenta.</p>'));
 
       /* movimiento */

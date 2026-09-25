@@ -61,6 +61,7 @@
       YO = d.yo || YO;
       if (d.personas && K.piezas.personas) K.piezas.personas.cargar(d.personas);
       if (d.push && K.piezas.avisos && K.piezas.avisos.configurar) K.piezas.avisos.configurar(d.push);
+      if (d.config && K.piezas.guia) K.piezas.guia.configurar(d.config);   /* guías rápidas: el id del PDF de cada app llega en la configuración pública */
       if (d.config && K.piezas.creditos && K.piezas.creditos.configurar) K.piezas.creditos.configurar(d.config);
       quitar();
       return d;
@@ -173,6 +174,7 @@
     menu.push({ texto: 'Actualizar contraseña', al: function () { K.piezas.sesion.cambiarClave(); } });
     menu.push({ texto: 'Instalar la app', al: function () { K.piezas.instalar.abrir(); } });
     /* soporte en TODAS las apps: hoja SOPORTE + grupo de desarrollo */
+    if (K.piezas.guia) menu.push(K.piezas.guia.opcion('CONTABILIDAD'));
     menu.push({ texto: 'Soporte', al: function () { if (K.piezas.soporte) K.piezas.soporte.abrir({ vista: vistaActual() }); } });
     menu.push({ texto: 'Cerrar sesión', al: salir, peligro: true });
     K.piezas.banner.montar({

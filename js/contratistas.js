@@ -426,7 +426,8 @@
       a.appendChild(ver);
     }
     /* 6.3 · las cuentas del contrato para descargar, y pedirle algo */
-    if (C.puede && C.puede('descargarInforme')) {
+    /* 25/09 · en esta app el CORE entrega el informe con el permiso 'contratistas' (no hay 'descargarInforme') */
+    if (C.puede && C.puede('contratistas')) {
       var inf = K.nodo('<button type="button" class="ins-accion" aria-label="Informe de cuentas de ' + K.esc(f.nombre) + '">' + K.icono('pdf', 16) + ' Informe</button>');
       inf.addEventListener('click', function () { K.vibrar(8); C.irA('informe/' + encodeURIComponent(f.id)); });
       a.appendChild(inf);

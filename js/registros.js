@@ -214,7 +214,7 @@
       c.appendChild(K.nodo('<p class="rp-fila__d">Orden ' + K.esc(x.orden) + ' · contrato ' + K.esc(x.contrato || '—') + ' · cuenta ' + K.esc(x.informe || '?') +
         ' · cobro ' + K.esc(K.pesos(x.cobro)) + (x.neto ? ' · neto ' + K.esc(K.pesos(x.neto)) : '') + '</p>'));
       if (x.descuentos) c.appendChild(K.nodo('<p class="rp-fila__r">' + K.icono('moneda', 12) + ' ' + K.esc(x.descuentos) + '</p>'));
-      if (META.todas && x.elaboro) c.appendChild(K.nodo('<p class="rp-fila__m">Elaboró: ' + K.esc(O.nombre(x.elaboro)) + '</p>'));
+      if (META.todas && x.elaboro) c.appendChild(K.nodo('<p class="rp-fila__r"><span>Elaboró:</span> ' + K.esc(O.nombre(x.elaboro)) + '</p>'));
       r.appendChild(c);
       var der = K.nodo('<div class="rg-der"></div>');
       der.appendChild(K.nodo('<span class="kit-pastilla ct-t__estado of-estado ' +

@@ -2689,3 +2689,6 @@
 .op-tabla__girar b { color: var(--k-ok); }
 .op-copiar { background: none; border: 1px solid var(--k-linea); border-radius: var(--k-r-pill); padding: 2px 8px; font: inherit; color: inherit; cursor: pointer; }
 @media (max-width: 560px) { .op-op { grid-template-columns: 1fr auto; } .op-op .op-valor { grid-column: auto; } }
+
+/* 25/09 · el resumen del inicio va debajo de su título (la hoja base lo sube sobre la franja del contratista) */
+.bloque > .resumen { margin-top: 0; }

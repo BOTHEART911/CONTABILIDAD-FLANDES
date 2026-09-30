@@ -45,10 +45,28 @@
       'Lo que cambies aquí vale para todo Contabilidad desde la próxima orden.');
     var zona = K.nodo('<div class="cf-zona"></div>');
     caja.appendChild(zona);
-    K.piezas.esqueletos.mientras(zona, O().leer('configuracion'), { forma: 'ficha', cuantos: 2, espera: 'Cargando la configuración' })
-      .then(function (d) { CFG = d; pintar(zona); })
-      ['catch'](function (e) { zona.appendChild(C.errorCaja(e)); });
+    var pC = O().leer('configuracion');
+    if (CFG) {
+      pintar(zona);
+      alLlegarNuevo(zona, CFG, pC, function (d, repintar) { CFG = d; if (repintar) pintar(zona); });
+    } else {
+      K.piezas.esqueletos.mientras(zona, pC, { forma: 'ficha', cuantos: 2, espera: 'Cargando la configuración' })
+        .then(function (d) { CFG = d; pintar(zona); })
+        ['catch'](function (e) { zona.appendChild(C.errorCaja(e)); });
+    }
     K.piezas.creditos.montar(caja);
+  }
+
+  /* 30/09 · Lo que ya está en el teléfono se pinta de una vez; la versión nueva
+     llega por detrás y solo se vuelve a pintar si cambió, la vista sigue
+     abierta y la persona no está escribiendo en ella. */
+  function alLlegarNuevo(zona, viejo, p, aplicar) {
+    var antes = JSON.stringify(viejo);
+    p.then(function (d) {
+      if (JSON.stringify(d) === antes) return;
+      if (!zona.isConnected || zona.contains(document.activeElement)) { aplicar(d, false); return; }
+      aplicar(d, true);
+    }, function () {});
   }
 
   function pintar(zona) {

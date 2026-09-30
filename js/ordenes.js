@@ -69,10 +69,11 @@
 
   /* ══════════════ los datos ══════════════ */
 
-  function leer(accion, datos, veces) {
-    return K.pedir(accion, datos, { ms: 60000 })['catch'](function (e) {
+  function leer(accion, datos, veces, op) {
+    /* 29/09 · op.fondo: la carga va a la cola de fondo del kit (K.vista) */
+    return K.pedir(accion, datos, { ms: 60000, fondo: !!(op && op.fondo) })['catch'](function (e) {
       var red = e && (e.codigo === 'RESPUESTA_NO_JSON' || e.codigo === 'SIN_RED' || e.codigo === 'TIEMPO');
-      if (red && (veces || 0) < 1) return leer(accion, datos, (veces || 0) + 1);
+      if (red && (veces || 0) < 1) return leer(accion, datos, (veces || 0) + 1, op);
       throw e;
     });
   }
@@ -86,10 +87,14 @@
     if (C.alCambiar) C.alCambiar(contar());
   }
 
-  function cargar(fresco) {
+  function cargar(fresco, fondo) {
     if (LISTA && !fresco) return Promise.resolve(LISTA);
-    if (CARGANDO && !fresco) return CARGANDO;       /* el inicio y la vista a la vez: un solo viaje */
-    CARGANDO = leer('ordenes', { fresco: !!fresco }).then(function (d) { CARGANDO = null; recibir(d); return LISTA; },
+    if (CARGANDO && !fresco) {
+      /* 29/09 · la vista hereda lo que el inicio dejó en la cola de fondo */
+      if (!fondo && K.vista) K.vista.adoptar('ordenes');
+      return CARGANDO;
+    }       /* el inicio y la vista a la vez: un solo viaje */
+    CARGANDO = leer('ordenes', { fresco: !!fresco }, 0, { fondo: fondo }).then(function (d) { CARGANDO = null; recibir(d); return LISTA; },
       function (e) { CARGANDO = null; throw e; });
     return CARGANDO;
   }

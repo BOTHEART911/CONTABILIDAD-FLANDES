@@ -176,7 +176,11 @@
   function verDocs(lista, i) {
     if (!K.piezas.visor) return;
     K.piezas.visor.abrir(lista.map(function (x) {
-      return { titulo: x.titulo, tipo: x.tipo || 'pdf', cargar: function () { return docPorBoleto(x.t, x.nombre); } };
+      /* 30/09 · el boleto ya lleva el id de Drive: el visor lo baja directo
+         de Drive y, si Drive no lo entrega, sigue por docPorBoleto (el CORE). */
+      var dr = K.drive && K.drive.deBoleto(x.t);
+      if (dr) dr.nombre = x.nombre || '';
+      return { titulo: x.titulo, tipo: x.tipo || 'pdf', drive: dr || null, cargar: function () { return docPorBoleto(x.t, x.nombre); } };
     }), { indice: i || 0 });
   }
 

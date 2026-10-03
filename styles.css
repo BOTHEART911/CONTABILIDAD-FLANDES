@@ -2070,6 +2070,21 @@
 .rv-t__cuenta b { font: 800 1.2rem/1 var(--k-fuente-titulo); color: var(--k-marca); }
 :root[data-tema="oscuro"] .rv-t__cuenta b { color: var(--k-marca-clara); }
 .rv-t__cuenta small { font: 600 .66rem/1.2 var(--k-fuente); color: var(--k-apagado); }
+/* 02/10 · la cuenta con factura electrónica: ícono que late debajo del número */
+.op-cuenta-col { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.op-factura {
+  display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+  color: #b45309; background: var(--k-aviso-fondo); border: 1px solid rgba(180, 83, 9, .35);
+  animation: op-latido 1.6s ease-in-out infinite;
+}
+:root[data-tema="oscuro"] .op-factura { color: #fbbf24; border-color: rgba(251, 191, 36, .4); }
+@keyframes op-latido {
+  0%, 60%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(180, 83, 9, .35); }
+  15% { transform: scale(1.14); box-shadow: 0 0 0 6px rgba(180, 83, 9, 0); }
+  30% { transform: scale(1); }
+  45% { transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) { .op-factura { animation: none; } }
 .rv-t__tarde { color: var(--k-malo); font-weight: 700; }
 .rv-t__tarde small { color: var(--k-apagado); font-weight: 400; }
 .rv-marca--vuelve { background: var(--k-malo-fondo); color: var(--k-malo); border-color: transparent; }

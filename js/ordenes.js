@@ -306,7 +306,7 @@
     if (K.piezas.personas) cab.appendChild(K.piezas.personas.avatar(c.nombre, { tam: 48, foto: c.img || '' }));
     cab.appendChild(K.nodo('<div class="ct-t__quien"><h3 class="ct-t__n">' + K.esc(nombre(c.nombre)) + '</h3>' +
       '<p class="ct-t__doc">CC/NIT ' + K.esc(c.doc) + '</p></div>'));
-    cab.appendChild(K.nodo('<span class="rv-t__cuenta"><b>' + K.esc(c.informe) + '</b><small>de ' + K.esc(c.total || '—') + '</small></span>'));
+    cab.appendChild(cuentaYFactura(c));
     t.appendChild(cab);
     var dias = diasDesde(c.radicada);
     t.appendChild(K.nodo(
@@ -328,7 +328,7 @@
     var liqB = K.nodo('<button type="button" class="kit-btn kit-btn--marca ct-acc__ver">' + K.icono('moneda', 16) + (c.urlOrden ? ' Revisar la orden' : ' Liquidar') + '</button>');
     liqB.addEventListener('click', function () { K.vibrar(8); C.irA('orden/' + c.fila + '/' + encodeURIComponent(c.id) + '/' + c.informe); });
     a.appendChild(liqB);
-    if (c.tInforme) {
+    if (c.tInforme || c.tFactura) {
       var ver = K.nodo('<button type="button" class="kit-btn kit-btn--plano">' + K.icono('documento', 16) + ' Ver informe</button>');
       ver.addEventListener('click', function () { verInforme(c); });
       a.appendChild(ver);
@@ -337,11 +337,23 @@
     return t;
   }
 
+  /* 02/10 · el número de la cuenta y, si la cuenta trae factura electrónica
+     (columna FACTURA DIGITAL con valor), el ícono de factura que late */
+  var ICONO_FACTURA = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M6 2.5h12v19l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4z"/><path d="M9 7h6M9 10.5h6M9 14h3.5"/><path d="M14.5 15.8h1.2"/></svg>';
+  function cuentaYFactura(c) {
+    var col = K.nodo('<div class="op-cuenta-col"><span class="rv-t__cuenta"><b>' + K.esc(c.informe) + '</b><small>de ' + K.esc(c.total || '—') + '</small></span></div>');
+    if (c.facturaDigital) col.appendChild(K.nodo('<span class="op-factura" title="Trae factura electrónica" aria-label="Trae factura electrónica">' + ICONO_FACTURA + '</span>'));
+    return col;
+  }
+
   /* ══════════════ documentos ══════════════ */
 
   function verInforme(c) {
     var docs = [];
     if (c.tInforme) docs.push({ titulo: 'Informe de supervisión · cuenta ' + c.informe, t: c.tInforme, nombre: 'INFORME_SUPERVISION_' + c.informe + '.pdf' });
+    /* 02/10 · la factura electrónica va justo después del informe */
+    if (c.tFactura) docs.push({ titulo: 'Factura electrónica · cuenta ' + c.informe, t: c.tFactura, nombre: 'FACTURA_' + c.informe + '.pdf' });
     if (c.tActa) docs.push({ titulo: 'Acta final de cumplimiento', t: c.tActa, nombre: 'ACTA_' + c.informe + '.pdf' });
     if (c.tOrden) docs.push({ titulo: 'Orden de pago ' + (c.orden || ''), t: c.tOrden, nombre: 'OP_' + c.informe + '.pdf' });
     if (!docs.length) { K.aviso('Esta cuenta no tiene el informe de supervisión en la hoja.', 'aviso', 4000); return; }
@@ -413,7 +425,7 @@
       try { navigator.clipboard.writeText(c.doc); K.aviso('Documento copiado.', 'ok', 1600); } catch (e) {}
     });
     cab.appendChild(quien);
-    cab.appendChild(K.nodo('<span class="rv-t__cuenta"><b>' + K.esc(c.informe) + '</b><small>de ' + K.esc(c.total || '—') + '</small></span>'));
+    cab.appendChild(cuentaYFactura(c));
     ficha.appendChild(cab);
     ficha.appendChild(K.nodo('<div class="ct-t__marcas">' + marcasDe(c) + '</div>'));
     ficha.appendChild(K.nodo(
@@ -428,7 +440,7 @@
       '<div><dt>Régimen</dt><dd>' + (c.simple ? 'Régimen Simple' : 'Ordinario') + '</dd></div>' +
       '</dl>'));
     var accF = K.nodo('<div class="ct-acc"></div>');
-    if (c.tInforme || c.tActa || c.tOrden) {
+    if (c.tInforme || c.tFactura || c.tActa || c.tOrden) {
       var vi = K.nodo('<button type="button" class="kit-btn kit-btn--plano">' + K.icono('documento', 16) + ' Ver informe</button>');
       vi.addEventListener('click', function () { verInforme(c); });
       accF.appendChild(vi);

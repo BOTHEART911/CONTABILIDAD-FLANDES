@@ -2601,6 +2601,22 @@
 .op-op--si { border-color: rgba(var(--k-marca-rgb), .45); background: rgba(var(--k-marca-rgb), .05); }
 .op-op--no { opacity: .6; }
 .op-op small { grid-column: 2 / -1; color: var(--k-tinta-2); }
+/* 02/10 · base que se digita (IVA de la factura electrónica) */
+.op-base { grid-column: 1 / -1; display: grid; gap: 4px; font-size: .82rem; color: var(--k-tinta-2); }
+.op-base > span { font-weight: 600; }
+.op-base small { font-weight: 400; }
+.op-base input { padding: 9px 11px; border-radius: var(--k-r-md); border: 1px solid var(--k-linea); background: var(--k-papel); color: var(--k-tinta); font: inherit; font-size: .95rem; max-width: 220px; }
+.op-base input:focus { outline: 2px solid rgba(var(--k-marca-rgb), .35); border-color: var(--k-marca); }
+.op-base--falta input { border-color: var(--k-aviso); background: var(--k-aviso-fondo); }
+/* 02/10 · orden de pago atrasada */
+.op-atrasada { display: grid; gap: 10px; margin: 0 0 12px; padding: 12px; border-radius: var(--k-r-md); border: 1px dashed var(--k-linea); }
+.op-atrasada--si { border: 1px solid var(--k-aviso); background: var(--k-aviso-fondo); }
+.op-atrasada small { color: var(--k-aviso); font-weight: 600; }
+.op-atrasada .op-select { max-width: 220px; }
+.op-anombre { margin: 0 0 12px; }
+.op-anombre .op-select { max-width: 360px; }
+:root[data-tema="oscuro"] .op-atrasada small, :root[data-tema="oscuro"] .op-atrasada--si b { color: #fbbf24; }
+:root[data-tema="oscuro"] .op-base--falta input { border-color: #fbbf24; }
 .op-valor { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
 .op-cuentas { display: grid; gap: 8px; }
 .op-total { display: grid; gap: 4px; padding: 12px 14px; border-radius: var(--k-r-md); background: rgba(var(--k-marca-rgb), .06); }

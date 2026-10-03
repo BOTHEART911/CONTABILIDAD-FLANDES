@@ -11,8 +11,9 @@
    archivo contra los ejemplos del plan y contra lo que dio el CORE.
 
      MOTOR.liquidar(ctx, sel, cfg)
-       ctx = { tipo, simple, cobro, base, primera }
+       ctx = { tipo, simple, cobro, base, primera, factura }
        sel = { marcadas:{clave:bool}, publicidad:bool, valores:{clave:n},
+               bases:{clave:n} (las de base MANUAL, ej. el IVA de la factura),
                debito:{codigo,nombre}, credito:{codigo,nombre} }
        cfg = { retenciones, cuentas, reglas }   (la que trae 'ordenes')
    ============================================================ */
@@ -29,6 +30,15 @@
   }
 
   function redondear(v, paso) { paso = paso || 1; return Math.round(v / paso) * paso; }
+
+  /* 02/10 · base MANUAL (igual que FC7_baseManual_): la digita Contabilidad,
+     con centavos ('798.319,33' o 798319.33); el descuento se redondea. */
+  function baseManual(v) {
+    var s = String(v === null || v === undefined ? '' : v).replace(/\s|\$/g, '');
+    var n = typeof v === 'number' ? v : (s.indexOf(',') >= 0 ? Number(s.replace(/\./g, '').replace(',', '.')) : Number(s));
+    if (!isFinite(n) || n < 0) return 0;
+    return Math.round(n * 100) / 100;
+  }
 
   function aplicaATipo(r, tipo) {
     var t = norm(tipo);
@@ -57,12 +67,14 @@
       var clave = String(r.codigo || '').trim() || ('R' + i);
       if (!aplicaATipo(r, tipo)) return;
       var o = { clave: clave, codigo: String(r.codigo || '').trim(), nombre: String(r.nombre || ''), tipo: String(r.tipo || ''),
-                porcentaje: Number(r.porcentaje) || 0, baseTipo: r.base === 'TRAMO' ? 'TRAMO' : (r.base === 'IVA' ? 'IVA' : 'COBRO'),
+                porcentaje: Number(r.porcentaje) || 0, baseTipo: r.base === 'TRAMO' ? 'TRAMO' : (r.base === 'IVA' ? 'IVA' : (r.base === 'MANUAL' ? 'MANUAL' : 'COBRO')),
                 excluye: r.excluye instanceof Array ? r.excluye.map(String) : [],
-                automatica: !!r.automatica, disponible: true, motivo: '', marcada: false, nota: r.nota || '' };
-      o.base = o.baseTipo === 'TRAMO' ? Math.round(Number(ctx.base) || 0) : (o.baseTipo === 'IVA' ? Math.round(cobro - cobro / (1 + iva / 100)) : cobro);
+                automatica: !!r.automatica, soloFactura: !!r.soloFactura, disponible: true, motivo: '', marcada: false, nota: r.nota || '' };
+      o.base = o.baseTipo === 'TRAMO' ? Math.round(Number(ctx.base) || 0) : (o.baseTipo === 'IVA' ? Math.round(cobro - cobro / (1 + iva / 100)) :
+               (o.baseTipo === 'MANUAL' ? baseManual(sel.bases && sel.bases[clave]) : cobro));
       if (r.activa === false) { o.disponible = false; o.motivo = 'Apagada en Configuración'; }
       else if (!o.porcentaje) { o.disponible = false; o.motivo = 'Sin porcentaje en Configuración'; }
+      else if (r.soloFactura && !ctx.factura) { o.disponible = false; o.motivo = 'Solo para quien presenta factura electrónica'; }
       else if (r.soloPrimeraCuenta && !ctx.primera) { o.disponible = false; o.motivo = 'Solo en la primera cuenta del tramo'; }
       else if (excluirSimple.indexOf(o.codigo) >= 0 || excluirSimple.indexOf(o.nombre) >= 0) { o.disponible = false; o.motivo = 'No aplica a Régimen Simple'; }
       else if (o.baseTipo === 'TRAMO' && !o.base) { o.disponible = false; o.motivo = 'El contrato no tiene el valor de este tramo'; }
@@ -75,6 +87,7 @@
       }
       o.calculado = redondear(o.base * o.porcentaje / 100, paso);
       o.valor = o.calculado;
+      if (o.baseTipo === 'MANUAL' && o.marcada && !(o.base > 0)) o.faltaBase = true;
       if (sel.valores && Object.prototype.hasOwnProperty.call(sel.valores, clave)) {
         var ed = Math.round(Number(sel.valores[clave]));
         if (isFinite(ed) && ed >= 0) { o.valor = ed; o.editado = ed !== o.calculado; }
@@ -104,7 +117,8 @@
       publicidad: { existe: !!conOpcion, marcada: !!(sel.publicidad && conOpcion), nombre: conOpcion ? conOpcion.opcion : '' },
       debito: usar && usar.debito ? { codigo: String(usar.debito.codigo), nombre: String(usar.debito.nombre || '') } : null,
       credito: usar && usar.credito ? { codigo: String(usar.credito.codigo), nombre: String(usar.credito.nombre || '') } : null,
-      opciones: opciones, aplicadas: aplicadas, retenido: total, neto: neto
+      opciones: opciones, aplicadas: aplicadas, retenido: total, neto: neto,
+      faltaBase: aplicadas.filter(function (o) { return o.faltaBase; }).map(function (o) { return o.nombre; })
     };
   }
 
@@ -119,5 +133,14 @@
     return anio + d;
   }
 
-  raiz.MOTOR = { liquidar: liquidar, numeroOrden: numeroOrden, norm: norm };
+  /* 798319.33 -> '798.319,33'; los centavos solo si los hay (igual que FC7_pesosDec_) */
+  function pesosDec(v) {
+    var n = Math.abs(Number(v) || 0), ent = Math.floor(n), cent = Math.round((n - ent) * 100);
+    if (cent === 100) { ent++; cent = 0; }
+    var s = String(ent), out = '';
+    while (s.length > 3) { out = '.' + s.slice(-3) + out; s = s.slice(0, -3); }
+    return ((Number(v) || 0) < 0 ? '-' : '') + s + out + (cent ? ',' + ('0' + cent).slice(-2) : '');
+  }
+
+  raiz.MOTOR = { liquidar: liquidar, numeroOrden: numeroOrden, norm: norm, baseManual: baseManual, pesosDec: pesosDec };
 }(typeof window !== 'undefined' ? window : this));

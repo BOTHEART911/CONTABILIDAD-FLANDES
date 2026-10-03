@@ -120,13 +120,18 @@
 
   /* ══════════════ la selección de cada cuenta ══════════════ */
 
-  function ctxDe(c) { return { tipo: c.tipo, simple: !!c.simple, cobro: c.cobro, base: c.base, primera: !!c.primera }; }
+  function ctxDe(c) { return { tipo: c.tipo, simple: !!c.simple, cobro: c.cobro, base: c.base, primera: !!c.primera, factura: !!c.facturaDigital }; }
 
   function selDe(c) {
     if (SEL[c.fila]) return SEL[c.fila];
-    var s = { marcadas: {}, publicidad: false, valores: {}, debito: null, credito: null, numero: '', usarRp: false };
+    var s = { marcadas: {}, publicidad: false, valores: {}, bases: {}, debito: null, credito: null, numero: '', usarRp: false,
+              atrasada: false, fechaOrden: '', aNombre: '' };
     var sug = c.sugerida || {};
-    (sug.opciones || []).forEach(function (o) { if (o.disponible && !o.automatica) s.marcadas[o.clave] = !!o.marcada; });
+    (sug.opciones || []).forEach(function (o) {
+      if (o.disponible && !o.automatica) s.marcadas[o.clave] = !!o.marcada;
+      /* 02/10 · la base que se escribio la vez pasada (IVA de la factura) se sugiere otra vez */
+      if (o.baseTipo === 'MANUAL' && o.base > 0) s.bases[o.clave] = o.base;
+    });
     s.publicidad = !!(sug.publicidad && sug.publicidad.marcada);
     if (c.orden) s.numero = String(parseInt(String(c.orden).slice(4), 10) || '');
     s.usarRp = !!(c.cedido && c.rpCesion && !c.rpCesionUsado);
@@ -497,6 +502,9 @@
       '<p class="op-nota">Así sale en el PDF. Débitos y créditos siempre cuadran: el crédito de la cuenta del beneficiario es el valor a girar.</p></section>');
     zona.appendChild(mov);
 
+    /* 02/10 · fecha atrasada y (DEV) a nombre de quién: fuera de la barra fija, para que no tape la orden */
+    var extra = K.nodo('<section class="kit-tarjeta grupo op-grupo op-extra"><h3 class="grupo__t">' + K.icono('reloj', 16) + ' Fecha y firma de la orden</h3><div class="op-extra__z"></div></section>');
+    zona.appendChild(extra);
     var fin = K.nodo('<section class="kit-tarjeta op-fin"></section>');
     zona.appendChild(fin);
 
@@ -534,9 +542,11 @@
         ch.disabled = !o.disponible || o.automatica;
         lab.querySelector('b').textContent = o.nombre;
         lab.querySelector('small').textContent = o.disponible
-          ? (o.automatica ? 'Automático · ' : '') + o.porcentaje.toString().replace('.', ',') + ' % sobre ' + pesos(o.base) +
-            (o.baseTipo === 'TRAMO' ? ' (valor del tramo)' : (o.baseTipo === 'IVA' ? ' (IVA incluido en el cobro)' : ' (el cobro)')) +
-            (o.reemplazada ? ' · lo reemplaza ' + o.reemplazada : '')
+          ? (o.automatica ? 'Automático · ' : '') + o.porcentaje.toString().replace('.', ',') + ' % sobre ' +
+            (o.baseTipo === 'MANUAL' ? (o.base > 0 ? MOTOR.pesosDec(o.base) + ' (la base que escribiste)' : 'la base que escribas abajo') :
+              pesos(o.base) + (o.baseTipo === 'TRAMO' ? ' (valor del tramo)' : (o.baseTipo === 'IVA' ? ' (IVA incluido en el cobro)' : ' (el cobro)'))) +
+            (o.reemplazada ? ' · lo reemplaza ' + o.reemplazada : '') +
+            (o.excluye.length && o.marcada ? ' · quita ' + liq.opciones.filter(function (x) { return o.excluye.indexOf(x.clave) >= 0; }).map(function (x) { return x.nombre; }).join(', ') : '')
           : o.motivo;
         ch.addEventListener('change', function () { s.marcadas[o.clave] = ch.checked; K.vibrar(5); refrescar(); });
         fila.appendChild(lab);
@@ -545,6 +555,8 @@
         val.disabled = !o.marcada;
         val.addEventListener('click', function () { editarValor(o, fila, val); });
         fila.appendChild(val);
+        /* 02/10 · base MANUAL: el valor base se digita aquí, con centavos (ej. el IVA de la factura electrónica) */
+        if (o.baseTipo === 'MANUAL' && o.disponible && o.marcada) fila.appendChild(campoBase(o));
         zOps.appendChild(fila);
       });
       if (liq.publicidad.existe) {
@@ -584,17 +596,33 @@
       if (liq.credito) lineas.push([liq.credito.codigo, liq.credito.nombre, 0, liq.neto, '', '', '']);
       var peso = function (o) { return o.tipo === 'Fuente' ? 0 : (o.tipo === 'I.C.A.' ? 1 : (/PROCULTURA/i.test(o.nombre) ? 2 : 3)); };
       liq.aplicadas.slice().sort(function (a, b) { return peso(a) - peso(b); }).forEach(function (o) {
-        lineas.push([o.codigo || '—', o.nombre, 0, o.valor, o.tipo, o.base, String(o.porcentaje).replace('.', ',')]);
+        lineas.push([o.codigo || '—', o.nombre, 0, o.valor, o.tipo, o.base, String(o.porcentaje).replace('.', ','), o.baseTipo === 'MANUAL']);
       });
       mz.innerHTML = '<div class="op-tabla" role="table"><div class="op-tabla__f op-tabla__cab" role="row"><span>Cuenta</span><span>Nombre de la cuenta</span><span>Débito</span><span>Crédito</span><span>Tipo</span><span>Base</span><span>%</span></div>' +
         lineas.map(function (l) {
           return '<div class="op-tabla__f" role="row"><span>' + K.esc(l[0]) + '</span><span>' + K.esc(l[1]) + '</span><span>' + K.esc(K.numero(l[2])) +
-            '</span><span>' + K.esc(K.numero(l[3])) + '</span><span>' + K.esc(l[4]) + '</span><span>' + (l[5] ? K.esc(K.numero(l[5])) : '') + '</span><span>' + K.esc(l[6]) + '</span></div>';
+            '</span><span>' + K.esc(K.numero(l[3])) + '</span><span>' + K.esc(l[4]) + '</span><span>' + (l[5] ? K.esc(l[7] ? MOTOR.pesosDec(l[5]) : K.numero(l[5])) : '') + '</span><span>' + K.esc(l[6]) + '</span></div>';
         }).join('') +
         '<div class="op-tabla__f op-tabla__tot" role="row"><span></span><span>Totales</span><span>' + K.esc(K.numero(liq.cobro)) + '</span><span>' + K.esc(K.numero(liq.cobro)) +
         '</span><span class="op-tabla__girar">A girar <b>' + K.esc(pesos(liq.neto)) + '</b></span></div></div>';
       c._liq = liq;
       pintarFin();
+    }
+
+    function campoBase(o) {
+      var cb = K.nodo('<label class="op-base' + (o.faltaBase ? ' op-base--falta' : '') + '"><span>Valor base <small>el de la factura electrónica, con decimales</small></span>' +
+        '<input inputmode="decimal" autocomplete="off" placeholder="Ej: 798.319,33"></label>');
+      var inp = cb.querySelector('input');
+      inp.value = o.base > 0 ? MOTOR.pesosDec(o.base) : '';
+      function fijar() {
+        var v = MOTOR.baseManual(inp.value);
+        if (v > 0) s.bases[o.clave] = v; else delete s.bases[o.clave];
+        delete s.valores[o.clave];          /* el valor sale otra vez de la base */
+        refrescar();
+      }
+      inp.addEventListener('change', fijar);
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+      return cb;
     }
 
     function editarValor(o, fila, boton) {
@@ -610,6 +638,47 @@
       }
       inp.addEventListener('blur', listo);
       inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { delete s.valores[o.clave]; refrescar(); } });
+    }
+
+    function pintarExtra() {
+      var zx = extra.querySelector('.op-extra__z');
+      zx.innerHTML = '';
+      /* 02/10 · ORDEN DE PAGO ATRASADA: solo días hábiles anteriores a hoy (los manda el CORE) */
+      var habiles = (LISTA && LISTA.habilesAtras) || [];
+      var atr = K.nodo('<div class="op-atrasada' + (s.atrasada ? ' op-atrasada--si' : '') + '">' +
+        '<label class="op-check"><input type="checkbox"><span><b>Orden de pago atrasada</b>' +
+        '<small>Solo de uso autorizado por Secretario(a) de Hacienda</small></span></label></div>');
+      var chA = atr.querySelector('input');
+      chA.checked = !!s.atrasada;
+      chA.disabled = !habiles.length;
+      if (s.atrasada) {
+        var fl = K.nodo('<label class="op-campo"><span>Fecha de la orden <small>días hábiles anteriores a hoy</small></span><select class="op-select"></select></label>');
+        var sf = fl.querySelector('select');
+        sf.appendChild(new Option('Escoge la fecha…', ''));
+        habiles.forEach(function (d) { sf.appendChild(new Option(d, d)); });
+        sf.value = s.fechaOrden || '';
+        sf.addEventListener('change', function () { s.fechaOrden = sf.value; });
+        atr.appendChild(fl);
+      }
+      chA.addEventListener('change', function () {
+        s.atrasada = chA.checked;
+        if (!s.atrasada) s.fechaOrden = '';
+        K.vibrar(5); pintarExtra();
+      });
+      zx.appendChild(atr);
+
+      /* 02/10 · el DEV escoge a nombre de quién sale la orden (firma como Elaboró) */
+      var fs = (LISTA && LISTA.firmantes) || null;
+      if (fs && fs.length) {
+        var fn = K.nodo('<label class="op-campo op-anombre"><span>Orden a nombre de <small>solo DEV · firma como Elaboró</small></span><select class="op-select"></select></label>');
+        var sn = fn.querySelector('select');
+        sn.appendChild(new Option('Yo (mi usuario)', ''));
+        fs.forEach(function (u) { sn.appendChild(new Option(nombre(u.nombre) + ' · ' + u.rol + (u.firma ? '' : ' · sin firma'), u.documento)); });
+        sn.value = s.aNombre || '';
+        sn.addEventListener('change', function () { s.aNombre = sn.value; pintarFin(); });
+        zx.appendChild(fn);
+      }
+
     }
 
     function pintarFin() {
@@ -630,9 +699,13 @@
       pintarNum();
       fin.appendChild(num);
 
+      var fs = (LISTA && LISTA.firmantes) || null;
+      var esc = fs && s.aNombre ? fs.filter(function (u) { return u.documento === s.aNombre; })[0] : null;
+      if (esc && esc.estado) f = esc.estado;
+
       if (!f.listo && f.faltan) fin.appendChild(K.nodo('<p class="op-nota op-nota--aviso">' + K.icono('lapiz', 14) + ' Falta ' + K.esc(f.faltan.join(' y ')) + ' para crear la orden.</p>'));
       else if (f.contador) fin.appendChild(K.nodo('<p class="op-nota">' + K.icono('lapiz', 14) + ' Firman: <b>' + K.esc(nombre(f.yo && f.yo.nombre)) + '</b> (Elaboró) y <b>' +
-        K.esc(nombre(f.contador.nombre)) + '</b> (Contador)' + (f.contador.mismo ? ' — eres tú en los dos lugares' : '') + '.</p>'));
+        K.esc(nombre(f.contador.nombre)) + '</b> (Contador)' + (f.contador.mismo ? (s.aNombre ? ' — la misma persona en los dos lugares' : ' — eres tú en los dos lugares') : '') + '.</p>'));
 
       var acc = K.nodo('<div class="op-fin__acc"></div>');
       var crearB = K.nodo('<button type="button" class="kit-btn kit-btn--marca op-crear">' + K.icono('documento', 18) + (c.urlOrden ? ' Crear de nuevo' : ' Crear orden') + '</button>');
@@ -654,6 +727,7 @@
         : '<b>Crear orden</b> arma el PDF con la plantilla, lo guarda en la carpeta de la cuenta y lo descarga en este equipo.') + '</p>'));
     }
 
+    pintarExtra();
     refrescar();
     if (C.alDetalle) C.alDetalle(c);
   }
@@ -662,8 +736,17 @@
 
   function crear(c, boton) {
     var s = selDe(c), liq = c._liq || liquidar(c), mot = motor(), f = firmas() || {};
+    var fs = (LISTA && LISTA.firmantes) || [];
+    var esc = s.aNombre ? fs.filter(function (u) { return u.documento === s.aNombre; })[0] : null;
+    if (esc && esc.estado) f = esc.estado;
     var numero = MOTOR.numeroOrden(s.numero, mot.vigencia);
     if (!numero) { K.aviso('Escribe el N° de la orden de pago (los dígitos finales, hasta 6).', 'aviso', 4500); var i = document.querySelector('.op-num input'); if (i) i.focus(); return; }
+    if (liq.faltaBase && liq.faltaBase.length) {
+      K.aviso('Escribe el valor base de ' + liq.faltaBase.join(' y ') + ' (el de la factura electrónica).', 'aviso', 6000);
+      var ib = document.querySelector('.op-base input'); if (ib) ib.focus();
+      return;
+    }
+    if (s.atrasada && !s.fechaOrden) { K.aviso('Escoge la fecha de la orden de pago atrasada.', 'aviso', 4500); var sf = document.querySelector('.op-atrasada select'); if (sf) sf.focus(); return; }
     if (!f.listo) {
       K.piezas.confirmar.avisar({ titulo: 'Faltan firmas', texto: 'Antes de crear la orden falta ' + (f.faltan || []).join(' y ') + '. Súbela en Configuración.' });
       return;
@@ -675,6 +758,8 @@
     liq.aplicadas.forEach(function (o) { lista.push([o.nombre + (o.editado ? ' (editado)' : ''), '− ' + pesos(o.valor)]); });
     lista.push(['Valor a girar', pesos(liq.neto)]);
     if (s.usarRp) lista.push(['RP de la cesión', c.rpCesion]);
+    if (s.atrasada) lista.push(['Fecha (orden atrasada)', s.fechaOrden]);
+    if (esc) lista.push(['A nombre de', nombre(esc.nombre)]);
     K.piezas.confirmar.preguntar({
       titulo: 'Crear la orden ' + numero,
       lista: lista, si: 'Crear orden', no: 'Revisar'
@@ -682,7 +767,8 @@
       if (!si) return;
       boton.disabled = true;
       var datos = { fila: c.fila, id: c.id, informe: c.informe, numero: numero, marcadas: s.marcadas, publicidad: !!s.publicidad,
-                    valores: s.valores, debito: s.debito, credito: s.credito, usarRpCesion: !!s.usarRp };
+                    valores: s.valores, bases: s.bases, debito: s.debito, credito: s.credito, usarRpCesion: !!s.usarRp,
+                    atrasada: !!s.atrasada, fechaOrden: s.atrasada ? s.fechaOrden : '', aNombre: s.aNombre || '' };
       return K.piezas.guardado.mientras(K.pedir('crearOrden', datos, { ms: 120000 }), {
         titulo: 'Creando la orden de pago', sub: 'No cierres esta ventana hasta que termine.',
         pasos: ['Cuadrando los descuentos…', 'Llenando la plantilla…', 'Guardando el PDF en la carpeta de la cuenta…', 'Casi listo…'],

@@ -25,7 +25,8 @@
   var C = {};
   var CFG = null;
 
-  var TIPOS_BASE = [{ v: 'COBRO', t: 'El cobro de la cuenta' }, { v: 'TRAMO', t: 'El valor del tramo (contrato o adición)' }, { v: 'IVA', t: 'El IVA incluido en el cobro' }];
+  var TIPOS_BASE = [{ v: 'COBRO', t: 'El cobro de la cuenta' }, { v: 'TRAMO', t: 'El valor del tramo (contrato o adición)' }, { v: 'IVA', t: 'El IVA incluido en el cobro' },
+                    { v: 'MANUAL', t: 'Un valor base que se escribe en la orden (ej. el IVA de la factura electrónica)' }];
 
   function O() { return window.OFICINA; }
   function nombre(s) { return K.piezas.personas ? K.piezas.personas.nombrePropio(s) : String(s || ''); }
@@ -245,7 +246,8 @@
     var tipos = mot.tipos || [];
     var s = seccion('check', 'RETENCIONES Y DESCUENTOS',
       'Cada fila es un check de la orden de pago. <b>Automática</b>: se aplica siempre y no se desmarca (ReteICA). ' +
-      '<b>Solo primera cuenta</b>: únicamente en la primera cuenta del contrato primario, de la 1ª o de la 2ª adición (las estampillas).');
+      '<b>Solo primera cuenta</b>: únicamente en la primera cuenta del contrato primario, de la 1ª o de la 2ª adición (las estampillas). ' +
+      '<b>Valor base que se escribe</b>: en la orden aparece un campo para digitar la base con decimales (ej. el IVA de la factura electrónica) y el descuento se redondea.');
     var zona = K.nodo('<div class="cf-ret"></div>');
     s.appendChild(zona);
 
@@ -273,7 +275,7 @@
       t.appendChild(g);
       var sws = K.nodo('<div class="cf-item__sw"></div>');
       [['activa', 'Encendida', r.activa !== false], ['automatica', 'Automática', r.automatica], ['soloPrimeraCuenta', 'Solo primera cuenta del tramo', r.soloPrimeraCuenta],
-       ['porDefecto', 'Marcada por defecto', r.porDefecto]].forEach(function (x) {
+       ['porDefecto', 'Marcada por defecto', r.porDefecto], ['soloFactura', 'Solo para quien presenta factura electrónica', r.soloFactura]].forEach(function (x) {
         var sw = interruptor(x[1], x[2]);
         sw.querySelector('input').addEventListener('change', function (e) { r[x[0]] = e.target.checked; if (x[0] === 'activa') t.classList.toggle('cf-item--off', !e.target.checked); });
         sws.appendChild(sw);

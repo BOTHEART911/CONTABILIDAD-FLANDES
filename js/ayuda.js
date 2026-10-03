@@ -111,14 +111,16 @@
     orden: function () {
       return {
         guia: 'La orden de pago de UNA cuenta. Todo se calcula en tu teléfono al instante: marca o desmarca cada descuento, cambia un valor a mano o escoge otra cuenta contable. ' +
-              '**ReteICA** (0,9 % del cobro) va siempre. Las **estampillas** solo en la primera cuenta del tramo. Escribe solo los dígitos del **N° de orden** (1023 → 2026001023). ' +
+              '**ReteICA** (0,9 % del cobro) va siempre, salvo que marques **Imp. a las ventas por servicios 15 %** (solo con factura electrónica): ahí escribes el **valor base** de la factura con decimales y el descuento se redondea. ' +
+              'Las **estampillas** solo en la primera cuenta del tramo. Escribe solo los dígitos del **N° de orden** (1023 → 2026001023). ' +
+              '**Orden de pago atrasada** (solo con autorización de Secretario(a) de Hacienda) deja escoger un día hábil anterior a hoy como fecha de la orden. ' +
               '**Crear orden** arma el PDF, lo guarda en la carpeta de la cuenta y lo descarga; **Orden creada** pasa la cuenta a ORDEN DE PAGO y avisa al contratista y a Tesorería.',
         botones: [
           { texto: 'Explícame los descuentos', responde: function () {
               var c = OR() && OR()._actual(); if (!c) return 'Abre una cuenta para ver su liquidación.';
               var l = OR()._liquidar(c);
               if (!l.aplicadas.length) return 'No hay descuentos marcados: se giraría el cobro completo, ' + pesos(l.cobro) + '.';
-              return l.aplicadas.map(function (o) { return '· **' + o.nombre + '**: ' + String(o.porcentaje).replace('.', ',') + ' % de ' + pesos(o.base) + ' (' + (o.baseTipo === 'TRAMO' ? 'valor del tramo' : (o.baseTipo === 'IVA' ? 'IVA' : 'cobro')) + ') = ' + pesos(o.valor) + (o.editado ? ' ✎' : ''); }).join('\n') +
+              return l.aplicadas.map(function (o) { return '· **' + o.nombre + '**: ' + String(o.porcentaje).replace('.', ',') + ' % de ' + (o.baseTipo === 'MANUAL' ? MOTOR.pesosDec(o.base) : pesos(o.base)) + ' (' + (o.baseTipo === 'TRAMO' ? 'valor del tramo' : (o.baseTipo === 'IVA' ? 'IVA' : (o.baseTipo === 'MANUAL' ? 'base escrita' : 'cobro'))) + ') = ' + pesos(o.valor) + (o.editado ? ' ✎' : ''); }).join('\n') +
                 '\nTotal descuentos **' + pesos(l.retenido) + '** · neto a girar **' + pesos(l.neto) + '**.';
             } },
           { texto: '¿Por qué no puedo marcar algo?', responde: function () {

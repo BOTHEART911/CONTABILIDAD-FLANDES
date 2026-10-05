@@ -736,7 +736,7 @@
       fin.appendChild(acc);
       fin.appendChild(K.nodo('<p class="op-nota">' + (c.urlOrden
         ? 'La orden <b>' + K.esc(c.orden) + '</b> ya está en la carpeta de la cuenta. <b>Orden creada</b> la pasa a Tesorería y le avisa al contratista.'
-        : '<b>Crear orden</b> arma el PDF con la plantilla, lo guarda en la carpeta de la cuenta y lo descarga en este equipo.') + '</p>'));
+        : '<b>Crear orden</b> arma el PDF con la plantilla, lo guarda en la carpeta de la cuenta y lo abre en el visor.') + '</p>'));
     }
 
     pintarExtra();
@@ -780,17 +780,19 @@
       boton.disabled = true;
       var datos = { fila: c.fila, id: c.id, informe: c.informe, numero: numero, marcadas: s.marcadas, publicidad: !!s.publicidad,
                     valores: s.valores, bases: s.bases, debito: s.debito, credito: s.credito, usarRpCesion: !!s.usarRp,
-                    atrasada: !!s.atrasada, fechaOrden: s.atrasada ? s.fechaOrden : '', aNombre: s.aNombre || '' };
+                    atrasada: !!s.atrasada, fechaOrden: s.atrasada ? s.fechaOrden : '', aNombre: s.aNombre || '',
+                    /* 05/10 · viaja el ID, no el PDF: la orden se abre en el visor (regla de <100 KB) */
+                    sinPdf: true };
       return K.piezas.guardado.mientras(K.pedir('crearOrden', datos, { ms: 120000 }), {
         titulo: 'Creando la orden de pago', sub: 'No cierres esta ventana hasta que termine.',
         pasos: ['Cuadrando los descuentos…', 'Llenando la plantilla…', 'Guardando el PDF en la carpeta de la cuenta…', 'Casi listo…'],
         listo: { titulo: 'Orden ' + numero + ' creada', paso: 'Guardada en la carpeta de la cuenta' }
       }).then(function (r) {
-        var bytes = bytesDe(r.pdf);
-        c._pdf = { bytes: bytes, nombre: r.nombre };
+        /* CORE viejo (sin sinPdf) aún manda el PDF: se usa como antes */
+        if (r.pdf) { var bytes = bytesDe(r.pdf); c._pdf = { bytes: bytes, nombre: r.nombre }; bajarPdf(bytes, r.nombre); }
+        else c._pdf = null;
         c.urlOrden = r.url; c.orden = r.numero; c.tOrden = r.tOrden || c.tOrden;
         if (r.rpUsado) { c.rpCesionUsado = 'recién usado | ' + r.rpUsado; c.rp = r.rpUsado; }
-        bajarPdf(bytes, r.nombre);
         if (Math.abs(r.neto - liq.neto) > 0) K.aviso('Ojo: el servidor calculó ' + pesos(r.neto) + ' a girar.', 'aviso', 7000);
         /* misma ruta: el hash no cambia y no habría repintado; se repinta aquí (sin viajar) */
         var sub = c.fila + '/' + encodeURIComponent(c.id) + '/' + c.informe;
@@ -865,8 +867,8 @@
           }, function () { throw e; });
         });
       return K.piezas.guardado.mientras(peticion, {
-        titulo: 'Pasando la cuenta a Tesorería', sub: 'Estamos cambiando el estado y avisando.',
-        pasos: ['Cambiando a ORDEN DE PAGO…', 'Avisando al contratista…', 'Avisando a Tesorería…'],
+        titulo: 'Pasando la cuenta a Tesorería', sub: 'Estamos cambiando el estado.',
+        pasos: ['Cambiando a ORDEN DE PAGO…', 'Dejando los avisos en camino…'],
         listo: { titulo: 'Cuenta en Tesorería', paso: 'Orden de pago emitida' }
       }).then(function (r) {
         r = r || {};
@@ -880,6 +882,8 @@
           if (r.aviso && !r.aviso.ok) malos.push('al contratista (' + (r.aviso.error || 'no salió') + ')');
           if (r.grupo && !r.grupo.ok) malos.push('al grupo de Tesorería (' + (r.grupo.error || 'no salió') + ')');
           if (malos.length) K.aviso('La cuenta ya está en ORDEN DE PAGO, pero no se pudo avisar ' + malos.join(' ni ') + '.', 'aviso', 9000);
+          /* 05/10 · los avisos salen con el reloj del CORE (cola): no se espera a WhatsApp */
+          else if (r.encolado) K.aviso('Listo: ORDEN DE PAGO. El contratista y Tesorería reciben el aviso en los próximos minutos.', 'ok', 5000);
           else K.aviso('Listo: ORDEN DE PAGO. Avisados el contratista y Tesorería.', 'ok', 4000);
         }
         C.irA('ordenes');

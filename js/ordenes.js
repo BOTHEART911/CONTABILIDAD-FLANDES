@@ -811,7 +811,40 @@
     if (c.tOrden) window.OFICINA.verDocs([{ titulo: 'Orden de pago ' + (c.orden || ''), t: c.tOrden, nombre: 'OP_' + c.informe + '.pdf' }], 0);
   }
 
+  /* 05/10 · ORDEN CREADA YA NO SE QUEDA COLGADA
+     Medido en FC_MEDICION (01–05/10): el CORE la hace SIEMPRE (9–14 s,
+     todas OK, el estado cambia y los WhatsApp salen), pero a veces la
+     respuesta no vuelve al teléfono (el 404 del echo de Google, dos veces
+     seguidas, o la red de la oficina). Antes la tarjeta seguía en pantalla
+     y al tocar otra vez salía "ya no está CERRADA": 7 intentos sobre la
+     misma cuenta el 05/10. Ahora:
+       · se pide sinLista: el CORE ya no rearma toda la lista (3–4 s menos)
+         y aquí se quita la tarjeta de la lista en memoria;
+       · si la respuesta se pierde, UNA lectura de la lista dice la verdad:
+         si la cuenta ya no está CERRADA, quedó hecha y se dice así;
+       · "ya no está CERRADA (está en ORDEN DE PAGO)" es lo mismo: hecha. */
+  var YA_EN_ORDEN = /ya no esta cerrada.*orden de pago/i;
+
+  function quitarDeLista(c) {
+    delete SEL[c.fila];
+    if (LISTA && LISTA.cuentas) {
+      LISTA.cuentas = LISTA.cuentas.filter(function (x) { return !(x.fila === c.fila && String(x.id) === String(c.id) && x.informe === c.informe); });
+      HORA = new Date();
+      if (C.alCambiar) C.alCambiar(contar());
+    }
+    try { if (K.recuerdo) K.recuerdo.borrar(); if (K.recordado) K.recordado.olvidarTodo(); } catch (e) {}
+  }
+
+  /* ¿la cuenta sigue CERRADA en el servidor? (una lectura fresca) */
+  function sigueCerrada(c) {
+    return leer('ordenes', { fresco: true }, 0).then(function (d) {
+      recibir(d);
+      return cuentas().some(function (x) { return x.fila === c.fila && String(x.id) === String(c.id) && x.informe === c.informe; });
+    });
+  }
+
   function ordenCreada(c, boton) {
+    if (boton.disabled) return;
     K.piezas.confirmar.preguntar({
       titulo: 'Orden ' + (c.orden || '') + ' creada',
       texto: 'La cuenta ' + c.informe + ' de ' + nombre(c.nombre) + ' pasa a ORDEN DE PAGO. Se le avisa al contratista y al grupo de Tesorería.',
@@ -819,18 +852,36 @@
     }).then(function (si) {
       if (!si) return;
       boton.disabled = true;
-      return K.piezas.guardado.mientras(K.pedir('ordenCreada', { fila: c.fila, id: c.id, informe: c.informe }, { ms: 90000 }), {
+      var peticion = K.pedir('ordenCreada', { fila: c.fila, id: c.id, informe: c.informe, sinLista: true }, { ms: 90000 })
+        ['catch'](function (e) {
+          var msg = (e && e.message) || '';
+          if (YA_EN_ORDEN.test(K.norm ? K.norm(msg) : msg)) return { yaEstaba: true };
+          var red = e && (e.codigo === 'RESPUESTA_NO_JSON' || e.codigo === 'SIN_RED' || e.codigo === 'TIEMPO');
+          if (!red) throw e;
+          /* la respuesta se perdió: se pregunta al servidor cómo quedó */
+          return sigueCerrada(c).then(function (sigue) {
+            if (sigue) throw e;
+            return { yaEstaba: true, perdida: true };
+          }, function () { throw e; });
+        });
+      return K.piezas.guardado.mientras(peticion, {
         titulo: 'Pasando la cuenta a Tesorería', sub: 'Estamos cambiando el estado y avisando.',
         pasos: ['Cambiando a ORDEN DE PAGO…', 'Avisando al contratista…', 'Avisando a Tesorería…'],
         listo: { titulo: 'Cuenta en Tesorería', paso: 'Orden de pago emitida' }
       }).then(function (r) {
-        delete SEL[c.fila];
-        recibir(r.lista);
-        var malos = [];
-        if (r.aviso && !r.aviso.ok) malos.push('al contratista (' + (r.aviso.error || 'no salió') + ')');
-        if (r.grupo && !r.grupo.ok) malos.push('al grupo de Tesorería (' + (r.grupo.error || 'no salió') + ')');
-        if (malos.length) K.aviso('La cuenta ya está en ORDEN DE PAGO, pero no se pudo avisar ' + malos.join(' ni ') + '.', 'aviso', 9000);
-        else K.aviso('Listo: ORDEN DE PAGO. Avisados el contratista y Tesorería.', 'ok', 4000);
+        r = r || {};
+        /* CORE viejo (sin la bandera) aún manda la lista entera: se usa */
+        if (r.lista) { delete SEL[c.fila]; recibir(r.lista); }
+        quitarDeLista(c);
+        if (r.yaEstaba) {
+          K.aviso('Listo: la cuenta ' + c.informe + ' ya está en ORDEN DE PAGO.', 'ok', 5000);
+        } else {
+          var malos = [];
+          if (r.aviso && !r.aviso.ok) malos.push('al contratista (' + (r.aviso.error || 'no salió') + ')');
+          if (r.grupo && !r.grupo.ok) malos.push('al grupo de Tesorería (' + (r.grupo.error || 'no salió') + ')');
+          if (malos.length) K.aviso('La cuenta ya está en ORDEN DE PAGO, pero no se pudo avisar ' + malos.join(' ni ') + '.', 'aviso', 9000);
+          else K.aviso('Listo: ORDEN DE PAGO. Avisados el contratista y Tesorería.', 'ok', 4000);
+        }
         C.irA('ordenes');
       });
     })['catch'](function (e) { K.aviso((e && e.message) || 'No se pudo cambiar el estado.', 'malo', 8000); boton.disabled = false; });

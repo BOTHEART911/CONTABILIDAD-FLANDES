@@ -117,6 +117,23 @@
   function drvListo() { return !!drvLlave() && typeof fetch === 'function'; }
   function drvTipo(mime) { return /^image\//.test(mime) ? 'imagen' : (/pdf/.test(mime) ? 'pdf' : 'otro'); }
 
+  /* 06/10 · NOMBRE AL DESCARGAR: el mismo del archivo en Drive. Si el archivo
+     llegó convertido a PDF (Word, Excel o Doc de Google) la extensión pasa a
+     .pdf; si no trae extensión, se le pone la de su tipo. Solo se quitan los
+     signos que Windows no acepta en un nombre de archivo. */
+  var EXT_MIME = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx', 'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx', 'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx', 'text/plain': 'txt', 'text/csv': 'csv' };
+  function nombreArchivo(nombre, mime) {
+    var n = String(nombre || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').replace(/ \./g, '.').trim();
+    if (!n) return '';
+    var ext = EXT_MIME[String(mime || '').split(';')[0].trim()] || '';
+    if (ext === 'pdf' && /\.(docx?|xlsx?|pptx?|odt|ods|odp)$/i.test(n)) n = n.replace(/\.[a-z0-9]{2,5}$/i, '');
+    if (ext && !new RegExp('\\.' + ext + '$', 'i').test(n) && !(ext === 'jpg' && /\.jpe?g$/i.test(n))) n += '.' + ext;
+    return n;
+  }
+
   /** Boleto del CORE "id.fila.doc.vence.g.firma" → {id, google}. El id ya
       viaja dentro del boleto: no se expone nada nuevo. */
   function deBoleto(t) {
@@ -171,8 +188,14 @@
         throw new Error('Drive ' + r.status);
       });
     }
-    bajar(p.google).then(function (x) {
-      var v = { nombre: p.nombre || '', mime: x.mime, tipo: drvTipo(x.mime), bytes: x.bytes };
+    /* 06/10 · el NOMBRE REAL del archivo en Drive se pide a la vez que los bytes
+       (en paralelo, no suma tiempo): al descargar sale igual que en Drive */
+    var nombreReal = fetch(DRV_API + encodeURIComponent(p.id) + '?fields=name&supportsAllDrives=true&key=' + k,
+      { signal: ctrl ? ctrl.signal : undefined, credentials: 'omit' })
+      .then(function (r) { return r.ok ? r.json().then(function (j) { return String((j && j.name) || ''); }) : ''; })['catch'](function () { return ''; });
+    Promise.all([bajar(p.google), nombreReal]).then(function (a) {
+      var x = a[0];
+      var v = { nombre: nombreArchivo(a[1] || p.nombre || '', x.mime), mime: x.mime, tipo: drvTipo(x.mime), bytes: x.bytes };
       drvGuardar(p.id, v);
       DRV.medidas.push({ id: p.id.slice(0, 6), via: 'drive', kb: Math.round(x.bytes.length / 1024), ms: Date.now() - t0 });
       p.res(v);
@@ -198,7 +221,8 @@
     if (!r || !drvListo()) return Promise.reject(new Error('sin llave'));
     if (DRV.malo[r.id]) return Promise.reject(new Error('Drive no lo entregó'));
     var c = DRV.cache[r.id];
-    if (c) return Promise.resolve({ nombre: nombre || c.nombre, mime: c.mime, tipo: c.tipo, bytes: c.bytes });
+    /* 06/10 · el nombre de Drive gana: el que trae la app es solo un rótulo de respaldo */
+    if (c) return Promise.resolve({ nombre: c.nombre || nombre, mime: c.mime, tipo: c.tipo, bytes: c.bytes });
     var p = DRV.pend[r.id];
     if (!p) {
       p = { id: r.id, google: r.google, mime: r.mime, nombre: nombre || '' };
@@ -210,7 +234,7 @@
       var k = DRV.cola.indexOf(p);
       if (k > 0) { DRV.cola.splice(k, 1); DRV.cola.unshift(p); }
     }
-    return p.prom.then(function (v) { return { nombre: nombre || v.nombre, mime: v.mime, tipo: v.tipo, bytes: v.bytes }; });
+    return p.prom.then(function (v) { return { nombre: v.nombre || nombre, mime: v.mime, tipo: v.tipo, bytes: v.bytes }; });
   }
 
   /** Corta lo que se está bajando y lo que espera en cola (al cerrar el visor). */
@@ -225,6 +249,7 @@
   /** Lo que el visor necesita para abrir `d` directo de Drive (o null). */
   function drvDe(d) {
     if (!drvListo()) return null;
+
     if (d.drive) return drvNorm(d.drive);
     if (d.url && !/\/thumbnail\b|[?&]sz=/.test(d.url)) { var id = idDrive(d.url); if (id) return { id: id, google: /docs\.google\.com\/document/.test(d.url) }; }
     return null;
@@ -256,7 +281,7 @@
   }
 
   K.drive = {
-    listo: drvListo, deBoleto: deBoleto,
+    listo: drvListo, deBoleto: deBoleto, nombreArchivo: nombreArchivo,
     bytes: function (ref, nombre) { return drvBytes(ref, nombre, true); },
     precargar: function (ref) { if (drvNorm(ref) && drvListo()) drvBytes(ref, '', false)['catch'](function () {}); },
     cortar: drvCortar,
@@ -311,12 +336,97 @@
       d._bytes = bytes;
       d._blob = new Blob([bytes], { type: mime });
       d._url = URL.createObjectURL(d._blob);
-      d._nombre = r.nombre || d.titulo || 'documento';
+      d._nombre = nombreArchivo(r.nombre || d.nombre || d.titulo || 'documento', mime);
       d._tipo = d.tipo || r.tipo || (/^image\//.test(mime) ? 'imagen' : (/pdf/.test(mime) ? 'pdf' : 'otro'));
       d._pidiendo = null;
       return d;
     }, function (e) { d._pidiendo = null; throw e; });
     return d._pidiendo;
+  }
+
+  /* ── 05/10 · WORD Y EXCEL PINTADOS EN EL TELÉFONO ──
+     El visor de Google (/preview) no sirve dentro de la app: abre marcos de
+     inicio de sesión que el navegador bloquea (frame-ancestors) y se queda
+     en "Abriendo...". Aquí los bytes llegan directo de Drive (o del propio
+     teléfono) y se pintan con docx-preview (Word) o SheetJS (Excel); las
+     librerías se bajan solo la primera vez que hacen falta. El .doc antiguo
+     no lo lee ningún navegador: se ofrece abrirlo en Drive. */
+  var CDN_OF = {
+    jszip: 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
+    docx: 'https://cdn.jsdelivr.net/npm/docx-preview@0.4.1/dist/docx-preview.min.js',
+    xlsx: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
+  };
+  var MIME_OF = {
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'application/vnd.ms-excel': 'xls'
+  };
+  var libP = {};
+  function libOf(k) {
+    if (libP[k]) return libP[k];
+    libP[k] = new Promise(function (res, rej) {
+      var sc = document.createElement('script');
+      sc.src = CDN_OF[k]; sc.async = true;
+      sc.onload = function () { res(); };
+      sc.onerror = function () { libP[k] = null; rej(new Error('No se pudo cargar el lector. Revisa tu internet y toca Volver a intentar.')); };
+      document.head.appendChild(sc);
+    });
+    return libP[k];
+  }
+  function libsDe(ext) {
+    if (ext === 'docx') return libOf('jszip').then(function () { return libOf('docx'); });
+    if (ext === 'xlsx' || ext === 'xls') return libOf('xlsx');
+    return Promise.resolve();
+  }
+  /** docx | doc | xlsx | xls | '' */
+  function oficinaDe(d, mime) {
+    var e = String(d.ext || '').toLowerCase();
+    if (/^(docx?|xlsx?)$/.test(e)) return e;
+    var m = /\.(docx?|xlsx?)\s*$/i.exec(String(d._nombre || d.titulo || ''));
+    if (m) return m[1].toLowerCase();
+    return MIME_OF[String(mime || '').split(';')[0].trim()] || '';
+  }
+  function pintarOficina(d, lienzo, ext) {
+    sinZoom();
+    if (ext === 'doc') {
+      lienzo.innerHTML = '<div class="kit-visor__malo">Este es un Word antiguo (.doc): se abre en Drive.<br>' +
+        '<button type="button" class="kit-btn kit-btn--marca">Abrir en Drive</button></div>';
+      lienzo.querySelector('button').addEventListener('click', function () {
+        var u = d.enlace || d._urlAntes || d.url;
+        if (u) window.open(paraAbrir(u), '_blank', 'noopener'); else accion('bajar');
+      });
+      return Promise.resolve();
+    }
+    return libsDe(ext).then(function () {
+      if (actual() !== d) return;
+      lienzo.innerHTML = '';
+      var caja = document.createElement('div');
+      caja.className = 'kit-visor__ofi kit-visor__ofi--' + (ext === 'docx' ? 'word' : 'excel');
+      lienzo.appendChild(caja);
+      if (ext === 'docx') {
+        return window.docx.renderAsync(d._blob, caja, null, { inWrapper: true, ignoreLastRenderedPageBreak: true, breakPages: true, experimental: false });
+      }
+      var libro = window.XLSX.read(d._bytes, { type: 'array' });
+      var nombres = libro.SheetNames || [];
+      var pest = document.createElement('div');
+      pest.className = 'kit-visor__hojas-tab';
+      var cuerpo = document.createElement('div');
+      cuerpo.className = 'kit-visor__hoja-xls';
+      function ver(k) {
+        cuerpo.innerHTML = window.XLSX.utils.sheet_to_html(libro.Sheets[nombres[k]], { editable: false });
+        [].forEach.call(pest.children, function (b, j) { b.classList.toggle('on', j === k); });
+      }
+      nombres.forEach(function (n, k) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.textContent = n;
+        b.addEventListener('click', function () { ver(k); });
+        pest.appendChild(b);
+      });
+      if (nombres.length > 1) caja.appendChild(pest);
+      caja.appendChild(cuerpo);
+      if (nombres.length) ver(0);
+    });
   }
 
   function soltar(lista) {
@@ -373,6 +483,15 @@
       if (d._tipo === 'imagen') {
         montarImagen(lienzo, d._url, d.titulo);
         return;
+      }
+      var ofi = oficinaDe(d, d._blob && d._blob.type);
+      if (d._tipo !== 'pdf' && ofi) {
+        return pintarOficina(d, lienzo, ofi)['catch'](function (e) {
+          if (actual() !== d) return;
+          lienzo.innerHTML = '<div class="kit-visor__malo">' + K.esc((e && e.message) || 'No se pudo mostrar el archivo.') + '<br>' +
+            '<button type="button" class="kit-btn kit-btn--marca">Descargarlo</button></div>';
+          lienzo.querySelector('button').addEventListener('click', function () { accion('bajar'); });
+        });
       }
       if (d._tipo === 'pdf') {
         return dibujarPDF(d, lienzo)['catch'](function () {
@@ -991,8 +1110,18 @@
     docs.forEach(drvPreparar);
 
     if (!capa) crear();
-    if (capa.__resetPos) capa.__resetPos();
-    capa.classList.remove('kit-visor--chico');
+    /* 05/10 · si ya estaba abierto, se cambia el documento SIN mover la
+       ventana; si estaba minimizado, se restaura sola (con el tamaño que la
+       persona le había dado y el botón de minimizar en su sitio). Solo una
+       ventana cerrada vuelve a su sitio de siempre. */
+    var yaAbierto = capa.classList.contains('kit-visor--on');
+    if (yaAbierto && capa.classList.contains('kit-visor--chico')) accion('encoger');
+    else if (!yaAbierto) {
+      if (capa.__resetPos) capa.__resetPos();
+      capa.classList.remove('kit-visor--chico');
+      var bE = capa.querySelector('[data-a="encoger"]');
+      if (bE) { bE.textContent = '–'; bE.title = 'Minimizar'; }
+    }
     capa.classList.add('kit-visor--on');
     pintar();
   }
@@ -1015,6 +1144,8 @@
     abierto: function () { return !!(capa && capa.classList.contains('kit-visor--on')); },
     idDrive: idDrive, paraVer: paraVer, paraAbrir: paraAbrir, paraBajar: paraBajar,
     /* 5.4 · bajar pdf.js y su trabajador ANTES del primer documento */
-    precalentar: function () { return pdfjs()['catch'](function () { return null; }); }
+    precalentar: function () { return pdfjs()['catch'](function () { return null; }); },
+    /* 05/10 · bajar de una vez el lector de Word o Excel (ext: docx, xlsx, xls) */
+    precalentarOficina: function (ext) { return libsDe(String(ext || '').toLowerCase())['catch'](function () { return null; }); }
   };
 }());

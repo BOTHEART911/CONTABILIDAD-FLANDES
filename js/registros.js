@@ -105,7 +105,7 @@
     var caja = K.nodo('<div class="kit-ancho vista ct of rp rg"></div>');
     C.app.appendChild(caja);
     var cabTexto = 'Las órdenes de pago que has elaborado. Elige el periodo y descárgalas en PDF o Excel.';
-    O.cabecera(caja, 'pdf', 'REGISTROS', cabTexto);
+    O.cabecera(caja, 'pdf', 'MIS REGISTROS', cabTexto);
 
     var zR = K.nodo('<section class="kit-tarjeta rp-rango"></section>');
     var zAt = K.nodo('<div></div>');
@@ -328,7 +328,9 @@
       return String(a.elaboro).localeCompare(String(c.elaboro), 'es') || String(a.fecha).localeCompare(String(c.fecha)) || String(a.orden).localeCompare(String(c.orden));
     });
     if (!filas.length) return;
-    var nombre = 'Ordenes de pago ' + (F.desde ? O.fecha(F.desde).replace(/\//g, '-') : '') + (F.hasta && F.hasta !== F.desde ? ' a ' + O.fecha(F.hasta).replace(/\//g, '-') : '');
+    /* 06/10 · el nombre dice qué es, de quién y de cuándo: Ordenes_de_pago_GLORIA_HERRERA_01-10-2026_a_06-10-2026 */
+    var de = F.quien && filas[0] ? O.nombre(filas[0].elaboro) : (!META.todas && META.yo ? O.nombre(META.yo) : (META.todas ? 'todos los contables' : ''));
+    var nombre = 'Ordenes de pago ' + (de ? de + ' ' : '') + (F.desde ? O.fecha(F.desde).replace(/\//g, '-') : '') + (F.hasta && F.hasta !== F.desde ? ' a ' + O.fecha(F.hasta).replace(/\//g, '-') : '');
     boton.disabled = true; boton.classList.add('kit-ocupado');
     var op = informe(filas);
     if (!op.grupo) delete op.grupo;

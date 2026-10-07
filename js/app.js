@@ -205,6 +205,7 @@
     menu.push({ texto: 'Actualizar contraseña', al: function () { K.piezas.sesion.cambiarClave(); } });
     menu.push({ texto: 'Instalar la app', al: function () { K.piezas.instalar.abrir(); } });
     /* soporte en TODAS las apps: hoja SOPORTE + grupo de desarrollo */
+    if (puede('registros')) menu.push({ texto: 'Mis registros (descargar lo que hice)', al: function () { irA('registros'); } });
     if (K.piezas.guia) menu.push(K.piezas.guia.opcion('CONTABILIDAD'));
     menu.push({ texto: 'Soporte', al: function () { if (K.piezas.soporte) K.piezas.soporte.abrir({ vista: vistaActual() }); } });
     menu.push({ texto: 'Cerrar sesión', al: salir, peligro: true });
@@ -255,7 +256,7 @@
     inicio: 'Contabilidad',
     ordenes: 'ÓRDENES DE PAGO',
     orden: 'ORDEN DE PAGO',
-    registros: 'REGISTROS',
+    registros: 'MIS REGISTROS',
     contratistas: 'CONTRATISTAS',
     contratista: 'CONTRATISTA',
     informe: 'INFORME DE CUENTAS',
@@ -344,7 +345,8 @@
         'img/procesos_de_cuenta.webp', function () { abrirLista({}); });
       tOrd.push(accOrd);
     }
-    if (puede('registros')) tOrd.push(acceso('REGISTROS', esOficina() ? 'Todas las órdenes creadas, por contable y por periodo, en PDF o Excel' : 'Las órdenes que elaboraste, todas o por periodo, en PDF o Excel',
+    /* 06/10 · REGISTROS pasa a llamarse MIS REGISTROS en todo el ecosistema: es donde cada quien descarga lo que hizo */
+    if (puede('registros')) tOrd.push(acceso('MIS REGISTROS', esOficina() ? 'Todas las órdenes de pago creadas, por contable y por periodo. Descárgalas en PDF o Excel' : 'Las órdenes de pago que elaboraste, todas o por periodo. Descárgalas en PDF o Excel',
       'img/pdf.webp', function () { irA('registros'); }));
     if (tOrd.length) bloque('ÓRDENES DE PAGO', tOrd);
 

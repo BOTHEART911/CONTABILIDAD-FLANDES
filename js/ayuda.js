@@ -345,7 +345,7 @@
   };
 
 
-  var TITULOS = { inicio: 'Tu inicio', ordenes: 'Órdenes de pago', orden: 'Orden de pago', registros: 'Registros',
+  var TITULOS = { inicio: 'Tu inicio', ordenes: 'Órdenes de pago', orden: 'Orden de pago', registros: 'Mis registros',
                   contratistas: 'Contratistas', contratista: 'Ficha del contratista', informe: 'Informe de cuentas',
                   requerimientos: 'Requerimientos', comunicados: 'Comunicados', configuracion: 'Configuración', perfil: 'Mi firma y mi foto' };
 

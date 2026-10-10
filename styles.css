@@ -2723,3 +2723,6 @@
 
 /* 25/09 · el resumen del inicio va debajo de su título (la hoja base lo sube sobre la franja del contratista) */
 .bloque > .resumen { margin-top: 0; }
+
+/* 10/10 · botón INFORME GERENCIAL (Mis registros): el ícono en dorado lo distingue de PDF y Excel */
+.rp-gerencial svg { color: #c99e2e; }

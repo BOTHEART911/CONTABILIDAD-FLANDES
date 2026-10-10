@@ -91,7 +91,7 @@ var ARMAZON = [
   /* 5.3 · revisión de cuentas */
   './kit/carrusel.js', './kit/carrusel.css',
   /* 5.4 · reporte en PDF y Excel */
-  './kit/exportar.js', './kit/exportar.css'
+  './kit/exportar.js', './kit/exportar.css', './kit/gerencial.js'
 ];
 
 self.addEventListener('install', function (e) {

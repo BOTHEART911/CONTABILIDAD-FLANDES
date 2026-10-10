@@ -130,7 +130,8 @@
     caja.appendChild(resumen);
     var descargas = K.nodo('<div class="rp-bajar">' +
       '<button type="button" class="kit-btn kit-btn--marca" data-f="pdf">' + K.icono('pdf', 16) + ' Descargar PDF</button>' +
-      '<button type="button" class="kit-btn kit-btn--plano" data-f="xlsx">' + K.icono('hoja', 16) + ' Descargar Excel</button></div>');
+      '<button type="button" class="kit-btn kit-btn--plano" data-f="xlsx">' + K.icono('hoja', 16) + ' Descargar Excel</button>' +
+      '<button type="button" class="kit-btn kit-btn--plano rp-gerencial" data-f="gerencial">' + K.icono('grafica', 16) + ' Informe gerencial</button></div>');
     caja.appendChild(descargas);
     var conteo = K.nodo('<p class="ct-conteo" aria-live="polite"></p>');
     caja.appendChild(conteo);
@@ -255,7 +256,7 @@
       pintarResumen(filas);
       conteo.innerHTML = '<b>' + K.numero(filas.length) + '</b> ' + (filas.length === 1 ? 'orden' : 'órdenes') +
         (HORA ? '<span class="ct-sello">' + K.icono('reloj', 13) + ' Al día a las ' + K.esc(O.horaCorta(HORA)) + '</span>' : '');
-      descargas.querySelectorAll('button').forEach(function (x) { x.disabled = !filas.length; });
+      descargas.querySelectorAll('button').forEach(function (x) { x.disabled = x.getAttribute('data-f') === 'gerencial' ? !delPeriodo().length : !filas.length; });
       pintarLista();
     }
 
@@ -322,7 +323,64 @@
     };
   }
 
+  /* ══════════════ 10/10 · INFORME GERENCIAL ══════════════
+     Todas las órdenes del periodo y de la persona escogida (sin la búsqueda
+     ni la secretaría: es el panorama completo). Sale de lo que ya está en
+     el teléfono; la pieza kit/gerencial.js se baja al tocar el botón. */
+  function delPeriodo() {
+    return (DATA || []).filter(function (x) {
+      return x.fecha && (!F.desde || x.fecha >= F.desde) && (!F.hasta || x.fecha <= F.hasta) && (!F.quien || x._q === F.quien);
+    });
+  }
+  function specGerencial() {
+    var regs = delPeriodo(), s = sumas(regs);
+    var persona = F.quien && regs[0] ? O.nombre(regs[0].elaboro) : (!META.todas && META.yo ? O.nombre(META.yo) : (META.todas ? 'Todos los contables' : 'Sin nombre'));
+    var rango = (F.desde ? O.fecha(F.desde).replace(/\//g, '-') : '') + (F.hasta && F.hasta !== F.desde ? ' a ' + O.fecha(F.hasta).replace(/\//g, '-') : '');
+    var porEstado = {};
+    regs.forEach(function (x) { porEstado[x.estado || 'SIN ESTADO'] = (porEstado[x.estado || 'SIN ESTADO'] || 0) + (Number(x.cobro) || 0); });
+    return {
+      app: (window.MARCA && window.MARCA.TITULO) || 'Contabilidad', persona: persona, desde: F.desde, hasta: F.hasta,
+      nombre: ['Informe gerencial Contabilidad', persona, rango].filter(Boolean).join(' '),
+      palabra: ['orden de pago', 'órdenes de pago'],
+      etiquetas: { tipo: 'Estado de la orden', categoria: 'Secretaría', sujeto: 'Contratista', sujetos: 'contratistas', monto: 'Valor cobrado' },
+      tonos: { ok: 'Pagadas', info: 'En trámite de pago', aviso: 'Otras' },
+      registros: regs.map(function (x) {
+        return { fecha: x.fecha, tipo: x.estado || 'SIN ESTADO', tono: tonoEstado(x.estado), categoria: O.titulo(x.sec) || '', sujeto: O.nombre(x.nombre) || '',
+                 monto: Number(x.cobro) || 0, ref: 'Orden ' + (x.orden || '—') + ' · contrato ' + (x.contrato || '—') };
+      }),
+      secciones: [{
+        titulo: 'Valores de las órdenes de pago',
+        intro: 'Lo cobrado en las órdenes elaboradas, lo descontado y lo que queda neto para girar. Descuentos y neto se cuentan solo en las órdenes que tienen lo girado registrado' +
+          (s.sinNeto ? ' (' + K.numero(s.sinNeto) + ' no lo tienen).' : '.'),
+        kpis: [
+          { etiqueta: 'Valor cobrado', valor: K.pesos(s.cobro), nota: K.numero(regs.length) + ' órdenes', tono: 'info' },
+          { etiqueta: 'Descuentos', valor: K.pesos(s.descuentos), nota: s.neto ? (Math.round(s.descuentos * 1000 / (s.neto + s.descuentos)) / 10).toLocaleString('es-CO') + ' % de lo liquidado' : '', tono: 'aviso' },
+          { etiqueta: 'Neto a girar', valor: K.pesos(s.neto), nota: K.numero(s.contratos) + ' contratos', tono: 'ok' }
+        ],
+        graficas: [
+          { titulo: 'Composición de lo liquidado', tipo: 'proporcion', formato: 'pesos',
+            datos: [{ etiqueta: 'Neto a girar', valor: s.neto, tono: 'ok' }, { etiqueta: 'Descuentos', valor: s.descuentos, tono: 'aviso' }] },
+          { titulo: 'Valor por estado de la orden', tipo: 'barrasH', formato: 'pesos', titular: false,
+            datos: Object.keys(porEstado).map(function (k) { return { etiqueta: k, valor: porEstado[k] }; }).sort(function (a, b) { return b.valor - a.valor; }) }
+        ]
+      }]
+    };
+  }
+  function gerencial(boton) { lanzarGerencial(specGerencial(), boton, 'órdenes de pago'); }
+
+  function lanzarGerencial(sp, boton, palabra) {
+    var ex = K.piezas.exportar;
+    if (!ex || !ex.aGerencial) { K.aviso('El informe gerencial no está disponible en esta versión. Recarga la app.', 'aviso', 5000); return; }
+    if (!sp.registros.length) { K.aviso('No hay ' + palabra + ' en ese periodo para armar el informe.', 'aviso', 4000); return; }
+    boton.disabled = true; boton.classList.add('kit-ocupado');
+    ex.aGerencial(sp).then(function (r) {
+      K.aviso('Informe gerencial descargado (' + r.paginas + ' páginas).', 'ok', 3500);
+    }, function (e) { K.aviso((e && e.message) || 'No se pudo armar el informe.', 'malo', 6000); })
+      .then(function () { boton.disabled = false; boton.classList.remove('kit-ocupado'); });
+  }
+
   function bajar(formato, boton) {
+    if (formato === 'gerencial') { gerencial(boton); return; }
     if (!K.piezas.exportar) { K.aviso('La descarga no está disponible en esta versión.', 'aviso'); return; }
     var filas = filtradas().slice().sort(function (a, c) {
       return String(a.elaboro).localeCompare(String(c.elaboro), 'es') || String(a.fecha).localeCompare(String(c.fecha)) || String(a.orden).localeCompare(String(c.orden));
@@ -351,6 +409,7 @@
     _meta: function () { return META; },
     _filtradas: filtradas,
     _informe: informe,
+    _gerencial: specGerencial,
     _filtro: function () { return F; }
   };
 }());

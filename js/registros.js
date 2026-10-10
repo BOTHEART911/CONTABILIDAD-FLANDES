@@ -103,6 +103,7 @@
 
   function vista() {
     var caja = K.nodo('<div class="kit-ancho vista ct of rp rg"></div>');
+    if (K.piezas.exportar && K.piezas.exportar.prepararGerencial) K.piezas.exportar.prepararGerencial();   /* 10/10 · informe gerencial listo antes del toque */
     C.app.appendChild(caja);
     var cabTexto = 'Las órdenes de pago que has elaborado. Elige el periodo y descárgalas en PDF o Excel.';
     O.cabecera(caja, 'pdf', 'MIS REGISTROS', cabTexto);

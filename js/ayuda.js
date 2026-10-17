@@ -136,6 +136,10 @@
               return 'Los checks arrancan como en la cuenta ' + p.informe + (p.orden ? ' (orden ' + p.orden + ')' : '') +
                 (p.inferido ? ': se dedujeron de lo que se le giró con la app anterior.' : ': es lo que se guardó al crear esa orden.') +
                 (c.primera ? ' Como esta es la primera del tramo, las estampillas se sugieren aunque la anterior no las llevara.' : '');
+            } },
+          { texto: '¿Qué firma sale si no tengo contrato?', responde: function () {
+              return 'Si el administrador te marcó **SIN CONTRATO**, la orden de pago sale con la **firma y el nombre del usuario OFICINA** (no los tuyos), y hacia el contratista se lee **Usuario Contabilidad**.\n' +
+                'En tu pantalla no cambia nada: creas la orden igual y por dentro queda que la hiciste tú (en **Mis registros** y en el informe gerencial).';
             } }
         ]
       };

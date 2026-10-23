@@ -2623,6 +2623,8 @@
 .op-base input { padding: 9px 11px; border-radius: var(--k-r-md); border: 1px solid var(--k-linea); background: var(--k-papel); color: var(--k-tinta); font: inherit; font-size: .95rem; max-width: 220px; }
 .op-base input:focus { outline: 2px solid rgba(var(--k-marca-rgb), .35); border-color: var(--k-marca); }
 .op-base--falta input { border-color: var(--k-aviso); background: var(--k-aviso-fondo); }
+.op-base__pista { color: var(--k-tinta-3, var(--k-tinta-2)); font-size: .76rem; line-height: 1.35; }
+.op-base input { font-variant-numeric: tabular-nums; }
 /* 02/10 · orden de pago atrasada */
 .op-atrasada { display: grid; gap: 10px; margin: 0 0 12px; padding: 12px; border-radius: var(--k-r-md); border: 1px dashed var(--k-linea); }
 .op-atrasada--si { border: 1px solid var(--k-aviso); background: var(--k-aviso-fondo); }

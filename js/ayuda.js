@@ -112,6 +112,7 @@
       return {
         guia: 'La orden de pago de UNA cuenta. Todo se calcula en tu teléfono al instante: marca o desmarca cada descuento, cambia un valor a mano o escoge otra cuenta contable. ' +
               '**ReteICA** (0,9 % del cobro) va siempre, salvo que marques **Imp. a las ventas por servicios 15 %** (solo con factura electrónica): ahí escribes el **valor base** de la factura con decimales y el descuento se redondea. ' +
+              'Igual con **Honorarios persona jurídica 11 %**: al marcarla aparece su **valor base**. En esos campos el punto de miles sale solo; la coma la pones tú, solo para los centavos (ej. 4.621.848,74). ' +
               'Las **estampillas** solo en la primera cuenta del tramo. Escribe solo los dígitos del **N° de orden** (1023 → 2026001023). ' +
               '**Orden de pago atrasada** (solo con autorización de Secretario(a) de Hacienda) deja escoger un día hábil anterior a hoy como fecha de la orden. ' +
               '**Crear orden** arma el PDF, lo guarda en la carpeta de la cuenta y lo abre en el visor (desde ahí se descarga); **Orden creada** pasa la cuenta a ORDEN DE PAGO y el contratista y Tesorería reciben el aviso en los próximos minutos.',

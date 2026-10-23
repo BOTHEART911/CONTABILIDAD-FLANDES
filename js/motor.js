@@ -35,7 +35,10 @@
      con centavos ('798.319,33' o 798319.33); el descuento se redondea. */
   function baseManual(v) {
     var s = String(v === null || v === undefined ? '' : v).replace(/\s|\$/g, '');
-    var n = typeof v === 'number' ? v : (s.indexOf(',') >= 0 ? Number(s.replace(/\./g, '').replace(',', '.')) : Number(s));
+    /* 23/10 · el campo pone solo el punto de miles: '4.621.848' (sin coma) es cuatro millones,
+       no 4,6. La coma es la de los centavos. '798319.33' (punto decimal) sigue valiendo. */
+    var n = typeof v === 'number' ? v : (s.indexOf(',') >= 0 ? Number(s.replace(/\./g, '').replace(',', '.')) :
+            (/^\d{1,3}(\.\d{3})+$/.test(s) ? Number(s.replace(/\./g, '')) : Number(s)));
     if (!isFinite(n) || n < 0) return 0;
     return Math.round(n * 100) / 100;
   }
@@ -63,8 +66,14 @@
     var iva = (cfg.reglas && Number(cfg.reglas.iva)) || 19;
     var opciones = [], aplicadas = [], total = 0;
 
+    /* 23/10 · dos retenciones pueden compartir código contable (ReteIVA 15% del IVA e Imp. a las
+       ventas 15%, ambas 24362502): con la llave = código, marcar una marcaba las dos y el 15 %
+       salía doble. Si el código se repite, la llave es código|NOMBRE (igual que el CORE). */
+    var usos = {};
+    (cfg.retenciones || []).forEach(function (r) { var c0 = String(r.codigo || '').trim(); if (c0) usos[c0] = (usos[c0] || 0) + 1; });
     (cfg.retenciones || []).forEach(function (r, i) {
-      var clave = String(r.codigo || '').trim() || ('R' + i);
+      var cod = String(r.codigo || '').trim();
+      var clave = !cod ? ('R' + i) : (usos[cod] > 1 ? cod + '|' + norm(r.nombre) : cod);
       if (!aplicaATipo(r, tipo)) return;
       var o = { clave: clave, codigo: String(r.codigo || '').trim(), nombre: String(r.nombre || ''), tipo: String(r.tipo || ''),
                 porcentaje: Number(r.porcentaje) || 0, baseTipo: r.base === 'TRAMO' ? 'TRAMO' : (r.base === 'IVA' ? 'IVA' : (r.base === 'MANUAL' ? 'MANUAL' : 'COBRO')),
@@ -75,6 +84,7 @@
       if (r.activa === false) { o.disponible = false; o.motivo = 'Apagada en Configuración'; }
       else if (!o.porcentaje) { o.disponible = false; o.motivo = 'Sin porcentaje en Configuración'; }
       else if (r.soloFactura && !ctx.factura) { o.disponible = false; o.motivo = 'Solo para quien presenta factura electrónica'; }
+      else if (r.soloPrimeraCuenta && ctx.cesionario) { o.disponible = false; o.motivo = 'El cesionario no paga estampillas en su primera cuenta'; }
       else if (r.soloPrimeraCuenta && !ctx.primera) { o.disponible = false; o.motivo = 'Solo en la primera cuenta del tramo'; }
       else if (excluirSimple.indexOf(o.codigo) >= 0 || excluirSimple.indexOf(o.nombre) >= 0) { o.disponible = false; o.motivo = 'No aplica a Régimen Simple'; }
       else if (o.baseTipo === 'TRAMO' && !o.base) { o.disponible = false; o.motivo = 'El contrato no tiene el valor de este tramo'; }
@@ -97,7 +107,8 @@
     var fuera = {};
     opciones.forEach(function (o) { if (o.marcada) o.excluye.forEach(function (k) { fuera[k] = o.nombre; }); });
     opciones.forEach(function (o) {
-      if (o.marcada && fuera[o.clave] && fuera[o.clave] !== o.nombre) { o.marcada = false; o.reemplazada = fuera[o.clave]; }
+      var quita = fuera[o.clave] || fuera[o.codigo];   /* 'excluye' trae códigos */
+      if (o.marcada && quita && quita !== o.nombre) { o.marcada = false; o.reemplazada = quita; }
       if (o.marcada) { aplicadas.push(o); total += o.valor; }
     });
 

@@ -120,7 +120,8 @@
 
   /* ══════════════ la selección de cada cuenta ══════════════ */
 
-  function ctxDe(c) { return { tipo: c.tipo, simple: !!c.simple, cobro: c.cobro, base: c.base, primera: !!c.primera, factura: !!c.facturaDigital }; }
+  function ctxDe(c) { return { tipo: c.tipo, simple: !!c.simple, cobro: c.cobro, base: c.base, primera: !!c.primera, factura: !!c.facturaDigital,
+                               cesionario: !!c.cesionarioSinEstampillas }; }
 
   function selDe(c) {
     if (SEL[c.fila]) return SEL[c.fila];
@@ -621,11 +622,45 @@
       pintarFin();
     }
 
+    /* 23/10 · el campo de la base MANUAL (15 % de la factura, 11 % de honorarios y la que se
+       configure así): el punto de miles sale solo mientras se escribe; la coma la pone la
+       persona y es solo para los centavos (máximo 2). Un punto tecleado sin coma todavía se
+       toma como la coma (hay teclados de teléfono que solo traen el punto). El cursor vuelve
+       a quedar detrás de los mismos dígitos, igual que K.pesosEnVivo. */
+    function baseEnVivo(inp) {
+      function pintar() {
+        var crudo = inp.value, pos = inp.selectionStart || 0;
+        var antes = crudo.slice(0, pos).replace(/[^\d,]/g, '').length;
+        var limpio = crudo.replace(/[^\d,]/g, '');
+        var k = limpio.indexOf(',');
+        var ent = (k >= 0 ? limpio.slice(0, k) : limpio).replace(/^0+(?=\d)/, '');
+        var dec = k >= 0 ? limpio.slice(k + 1).replace(/,/g, '').slice(0, 2) : null;
+        if (k >= 0 && !ent) { ent = '0'; antes++; }   /* ',5' -> '0,5' con el cursor detrás del 5 */
+        var miles = '';
+        while (ent.length > 3) { miles = '.' + ent.slice(-3) + miles; ent = ent.slice(0, -3); }
+        inp.value = ent + miles + (dec === null ? '' : ',' + dec);
+        var p = 0, vistos = 0;
+        while (p < inp.value.length && vistos < antes) { if (/[\d,]/.test(inp.value[p])) vistos++; p++; }
+        try { inp.setSelectionRange(p, p); } catch (e) { /* algunos tipos de campo no dejan */ }
+      }
+      inp.addEventListener('beforeinput', function (e) {
+        if (e.data === '.' && inp.value.indexOf(',') < 0) {
+          e.preventDefault();
+          var a = inp.selectionStart || 0, b = inp.selectionEnd || a;
+          inp.setRangeText(',', a, b, 'end');
+          pintar();
+        }
+      });
+      inp.addEventListener('input', pintar);
+    }
+
     function campoBase(o) {
-      var cb = K.nodo('<label class="op-base' + (o.faltaBase ? ' op-base--falta' : '') + '"><span>Valor base <small>el de la factura electrónica, con decimales</small></span>' +
-        '<input inputmode="decimal" autocomplete="off" placeholder="Ej: 798.319,33"></label>');
+      var cb = K.nodo('<label class="op-base' + (o.faltaBase ? ' op-base--falta' : '') + '"><span>Valor base <small>con decimales</small></span>' +
+        '<input inputmode="decimal" autocomplete="off" placeholder="Ej: 4.621.848,74">' +
+        '<small class="op-base__pista">Los puntos de miles salen solos. La coma, solo para los centavos.</small></label>');
       var inp = cb.querySelector('input');
       inp.value = o.base > 0 ? MOTOR.pesosDec(o.base) : '';
+      baseEnVivo(inp);
       function fijar() {
         var v = MOTOR.baseManual(inp.value);
         if (v > 0) s.bases[o.clave] = v; else delete s.bases[o.clave];
@@ -754,7 +789,7 @@
     var numero = MOTOR.numeroOrden(s.numero, mot.vigencia);
     if (!numero) { K.aviso('Escribe el N° de la orden de pago (los dígitos finales, hasta 6).', 'aviso', 4500); var i = document.querySelector('.op-num input'); if (i) i.focus(); return; }
     if (liq.faltaBase && liq.faltaBase.length) {
-      K.aviso('Escribe el valor base de ' + liq.faltaBase.join(' y ') + ' (el de la factura electrónica).', 'aviso', 6000);
+      K.aviso('Escribe el valor base de ' + liq.faltaBase.join(' y ') + ' (con sus decimales).', 'aviso', 6000);
       var ib = document.querySelector('.op-base input'); if (ib) ib.focus();
       return;
     }

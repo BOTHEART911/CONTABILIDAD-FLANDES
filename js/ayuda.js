@@ -361,6 +361,7 @@
     var base = g();
     var cfg = {
       vista: (extra && extra.vista) || TITULOS[vista] || vista,
+      clave: vista,   /* 24/10 · el asistente sabe en qué vista está (preguntas frecuentes) */
       guia: function () { return g().guia; },
       botones: base.botones || [],
       alto: !!base.alto

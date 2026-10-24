@@ -60,10 +60,12 @@
       ? K.piezas.esqueletos.poner(app, { forma: 'ficha', cuantos: 1, sitio: 'reemplaza', espera: 'Cargando Contabilidad' })
       : function () {};
 
-    return (yaVino ? Promise.resolve(yaVino) : recordado ? Promise.resolve(recordado) : leer('inicio')).then(function (d) {
+    return (yaVino ? Promise.resolve(yaVino) : recordado ? Promise.resolve(recordado) : leer('inicio', { selloAsistente: selloAsistente() })).then(function (d) {
       ARRANQUE = d;
       YO = d.yo || YO;
       if (d.personas && K.piezas.personas) K.piezas.personas.cargar(d.personas);
+      /* 24/10 · ASISTENTE: la base viaja SOLO si cambió su sello y queda en el teléfono */
+      if (d.asistente && d.asistente.temas && K.piezas.asistente) K.piezas.asistente.base(d.asistente.temas, d.asistente.sello);
       if (d.push && K.piezas.avisos && K.piezas.avisos.configurar) K.piezas.avisos.configurar(d.push);
       if (d.config && K.piezas.guia) K.piezas.guia.configurar(d.config);   /* guías rápidas: el id del PDF de cada app llega en la configuración pública */
       if (d.config && K.piezas.creditos && K.piezas.creditos.configurar) K.piezas.creditos.configurar(d.config);
@@ -78,8 +80,11 @@
 
   /* 25/09 · el 'inicio' de verdad, por detrás: se aplica, se guarda y, si la
      persona sigue en el inicio, se vuelve a pintar con lo nuevo. */
+  /** 24/10 · el sello de la base del asistente que ya tiene el teléfono */
+  function selloAsistente() { return (K.piezas.asistente && K.piezas.asistente.selloGuardado()) || ''; }
+
   function refrescarArranque() {
-    leer('inicio').then(function (d) {
+    leer('inicio', { selloAsistente: selloAsistente() }).then(function (d) {
       return arranque(false, { arranque: d, refresco: true });
     }).then(function () {
       var v = String(location.hash || '').replace(/^#\/?/, '').split('/')[0] || 'inicio';
@@ -111,9 +116,15 @@
         sub: 'Ingresa con tu documento y contraseña',
         imagen: M.APP_ICON || 'img/icono-512.png',
         arranqueEnLogin: true,
+        datosArranque: function () { return { selloAsistente: selloAsistente() }; },   /* 24/10 · el sello del asistente */
         comprobar: function (login) { return arranque(true, login).then(function (d) { return d.yo; }); },
         alEntrar: arrancar
       });
+      /* 24/10 · el asistente también en la entrada (olvidé mi contraseña,
+         cómo instalo la app), sin datos de estado */
+      if (K.piezas.asistente && window.CONTABILIDAD_ASISTENTE && !K.token()) {
+        K.piezas.asistente.enEntrada(window.CONTABILIDAD_ASISTENTE.entrada);
+      }
     });
   });
 
@@ -128,6 +139,7 @@
 
   function arrancar(yo) {
     YO = yo || {};
+    if (K.piezas.asistente) K.piezas.asistente.salirEntrada();   /* 24/10 */
     montarBanner();
 
     if (K.piezas.avisos) {
@@ -230,6 +242,7 @@
   function salir() {
     if (K.piezas.avisos) K.piezas.avisos.olvidar();
     if (K.piezas.insights) K.piezas.insights.quitar();
+    if (K.piezas.asistente) K.piezas.asistente.olvidar();   /* 24/10 · la conversación no pasa a otra sesión */
     MODULOS.forEach(function (m) { if (window[m] && window[m].olvidar) window[m].olvidar(); });
     if (window.OFICINA && window.OFICINA.olvidarDocs) window.OFICINA.olvidarDocs();
     K.piezas.sesion.salir();
@@ -469,6 +482,17 @@
     b.addEventListener('click', function () { K.vibrar(8); al(); });
     return b;
   }
+
+  /* 24/10 · lo que el asistente (js/asistente-app.js) lee de la app, sin viajar */
+  window.CONTABILIDAD_APP = {
+    arranque: function () { return ARRANQUE; },
+    yo: function () { return YO || {}; },
+    puede: puede,
+    permiso: function (v) { return PERMISO[v] || v; },
+    abrirFoto: abrirFoto,
+    vistaActual: vistaActual,
+    irA: irA
+  };
 
   /* ══════════════ auxiliares ══════════════ */
 

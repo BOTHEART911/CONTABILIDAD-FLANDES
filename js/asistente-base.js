@@ -294,7 +294,7 @@ window.ASISTENTE_BASE = [
 "15 por ciento",
 "iva factura"
 ],
-"respuesta": "**ReteICA** (0,9 % del cobro) va siempre, salvo que marques **Imp. a las ventas por servicios 15 %**, que solo aplica con **factura electrónica**: al marcarlo escribes el **valor base** de la factura con sus decimales y el descuento se redondea. El punto de miles sale solo; la coma la pones tú, solo para los centavos (ej. 4.621.848,74).",
+"respuesta": "**ReteICA** (0,9 % del cobro) sale marcado y lo marcas o desmarcas tú en cualquier momento; ninguna otra retención lo quita. **Imp. a las ventas por servicios 15 %** solo aplica con **factura electrónica**: al marcarlo escribes el **valor base** de la factura con sus decimales y el descuento se redondea. El punto de miles sale solo; la coma la pones tú, solo para los centavos (ej. 4.621.848,74).",
 "accion": "",
 "estado": "",
 "activo": true,

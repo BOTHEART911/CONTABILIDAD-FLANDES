@@ -245,7 +245,7 @@
     var lista = copia(mot.retenciones || []);
     var tipos = mot.tipos || [];
     var s = seccion('check', 'RETENCIONES Y DESCUENTOS',
-      'Cada fila es un check de la orden de pago. <b>Automática</b>: se aplica siempre y no se desmarca (ReteICA). ' +
+      'Cada fila es un check de la orden de pago. <b>Automática</b>: se aplica siempre y no se desmarca. ' +
       '<b>Solo primera cuenta</b>: únicamente en la primera cuenta del contrato primario, de la 1ª o de la 2ª adición (las estampillas). ' +
       '<b>Valor base que se escribe</b>: en la orden aparece un campo para digitar la base con decimales (ej. el IVA de la factura electrónica) y el descuento se redondea.');
     var zona = K.nodo('<div class="cf-ret"></div>');

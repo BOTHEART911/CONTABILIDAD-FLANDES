@@ -57,6 +57,9 @@
     return String(tipo || '');
   }
 
+  var CODIGO_ICA = '41050803';
+  function esIca(r) { return String(r.codigo || '').trim() === CODIGO_ICA || norm(r.tipo).replace(/[.\s]/g, '') === 'ICA'; }
+
   function liquidar(ctx, sel, cfg) {
     sel = sel || {};
     var tipo = tipoLiquida(ctx.tipo, cfg);
@@ -79,6 +82,11 @@
                 porcentaje: Number(r.porcentaje) || 0, baseTipo: r.base === 'TRAMO' ? 'TRAMO' : (r.base === 'IVA' ? 'IVA' : (r.base === 'MANUAL' ? 'MANUAL' : 'COBRO')),
                 excluye: r.excluye instanceof Array ? r.excluye.map(String) : [],
                 automatica: !!r.automatica, soloFactura: !!r.soloFactura, disponible: true, motivo: '', marcada: false, nota: r.nota || '' };
+      /* 26/10 · el ReteICA se marca o desmarca A MANO con cualquier combinación: nunca automático
+         (el check no se bloquea) y ninguna otra retención lo quita. Sale marcado por defecto. */
+      var ica = esIca(r);
+      if (ica) { o.automatica = false; o.excluye = []; }
+      else o.excluye = o.excluye.filter(function (k) { return k !== CODIGO_ICA && k.split('|')[0] !== CODIGO_ICA; });
       o.base = o.baseTipo === 'TRAMO' ? Math.round(Number(ctx.base) || 0) : (o.baseTipo === 'IVA' ? Math.round(cobro - cobro / (1 + iva / 100)) :
                (o.baseTipo === 'MANUAL' ? baseManual(sel.bases && sel.bases[clave]) : cobro));
       if (r.activa === false) { o.disponible = false; o.motivo = 'Apagada en Configuración'; }
@@ -93,6 +101,7 @@
       if (o.disponible) {
         if (o.automatica) o.marcada = true;
         else if (pedida !== null) o.marcada = pedida;
+        else if (ica) o.marcada = r.porDefecto !== false;
         else o.marcada = r.soloPrimeraCuenta ? !!ctx.primera && r.porDefecto !== false : !!r.porDefecto;
       }
       o.calculado = redondear(o.base * o.porcentaje / 100, paso);

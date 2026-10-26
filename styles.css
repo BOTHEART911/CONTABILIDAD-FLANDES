@@ -2623,6 +2623,15 @@
 .op-base input { padding: 9px 11px; border-radius: var(--k-r-md); border: 1px solid var(--k-linea); background: var(--k-papel); color: var(--k-tinta); font: inherit; font-size: .95rem; max-width: 220px; }
 .op-base input:focus { outline: 2px solid rgba(var(--k-marca-rgb), .35); border-color: var(--k-marca); }
 .op-base--falta input { border-color: var(--k-aviso); background: var(--k-aviso-fondo); }
+/* 26/10 · ReteICA "Sobre base" */
+.op-sobre { grid-column: 1 / -1; display: grid; gap: 8px; padding: 8px 0 2px 26px; border-top: 1px dashed var(--k-linea); }
+.op-sobre .op-check { font-size: .88rem; }
+.op-sobre select { padding: 9px 11px; border-radius: var(--k-r-md); border: 1px solid var(--k-linea); background: var(--k-papel); color: var(--k-tinta); font: inherit; font-size: .92rem; max-width: 100%; }
+.op-sobre select:focus { outline: 2px solid rgba(var(--k-marca-rgb), .35); border-color: var(--k-marca); }
+.op-sobre, .op-sobre > *, .op-sobre .op-base { min-width: 0; }
+.op-sobre small, .op-sobre .op-base > * { grid-column: auto; }
+.op-sobre select { width: 100%; text-overflow: ellipsis; }
+.op-sobre .op-base--falta select { border-color: var(--k-aviso); background: var(--k-aviso-fondo); }
 .op-base__pista { color: var(--k-tinta-3, var(--k-tinta-2)); font-size: .76rem; line-height: 1.35; }
 .op-base input { font-variant-numeric: tabular-nums; }
 /* 02/10 · orden de pago atrasada */

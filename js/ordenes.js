@@ -125,13 +125,13 @@
 
   function selDe(c) {
     if (SEL[c.fila]) return SEL[c.fila];
-    var s = { marcadas: {}, publicidad: false, valores: {}, bases: {}, debito: null, credito: null, numero: '', usarRp: false,
+    var s = { marcadas: {}, publicidad: false, valores: {}, bases: {}, sobreBase: {}, baseDe: {}, debito: null, credito: null, numero: '', usarRp: false,
               atrasada: false, fechaOrden: '', aNombre: '' };
     var sug = c.sugerida || {};
     (sug.opciones || []).forEach(function (o) {
       if (o.disponible && !o.automatica) s.marcadas[o.clave] = !!o.marcada;
       /* 02/10 · la base que se escribio la vez pasada (IVA de la factura) se sugiere otra vez */
-      if (o.baseTipo === 'MANUAL' && o.base > 0) s.bases[o.clave] = o.base;
+      if (o.baseTipo === 'MANUAL' && o.base > 0 && !o.ica) s.bases[o.clave] = o.base;
     });
     s.publicidad = !!(sug.publicidad && sug.publicidad.marcada);
     if (c.orden) s.numero = String(parseInt(String(c.orden).slice(4), 10) || '');
@@ -544,6 +544,7 @@
     }
 
     function refrescar() {
+      sincronizarSobreBase();
       var liq = MOTOR.liquidar(ctxDe(c), s, mot);
       /* descuentos */
       zOps.innerHTML = '';
@@ -569,7 +570,8 @@
         val.addEventListener('click', function () { editarValor(o, fila, val); });
         fila.appendChild(val);
         /* 02/10 · base MANUAL: el valor base se digita aquí, con centavos (ej. el IVA de la factura electrónica) */
-        if (o.baseTipo === 'MANUAL' && o.disponible && o.marcada) fila.appendChild(campoBase(o));
+        if (o.ica && o.disponible && o.marcada) fila.appendChild(campoSobreBase(o, liq));
+        else if (o.baseTipo === 'MANUAL' && o.disponible && o.marcada) fila.appendChild(campoBase(o));
         zOps.appendChild(fila);
       });
       if (liq.publicidad.existe) {
@@ -670,6 +672,52 @@
       inp.addEventListener('change', fijar);
       inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
       return cb;
+    }
+
+    /* 26/10 · ReteICA "Sobre base": check debajo del ReteICA; al marcarlo se escoge una de las bases
+       ya escritas en los otros campos (siguen sus cambios) o se escribe otra. El 0,9 % sale de ahí. */
+    function basesOtras(liq) {
+      return liq.opciones.filter(function (x) { return !x.ica && x.baseTipo === 'MANUAL' && x.base > 0; })
+        .map(function (x) { return { clave: x.clave, nombre: x.nombre, base: x.base }; });
+    }
+    function sincronizarSobreBase() {
+      Object.keys(s.baseDe || {}).forEach(function (k) {
+        var de = s.baseDe[k];
+        if (!s.sobreBase[k] || !de || de === 'manual') return;
+        if (s.bases[de] > 0) s.bases[k] = s.bases[de]; else delete s.bases[k];
+        delete s.valores[k];
+      });
+    }
+    function campoSobreBase(o, liq) {
+      var z = K.nodo('<div class="op-sobre"><label class="op-check"><input type="checkbox"><span><b>Sobre base</b>' +
+        '<small>El 0,9 % se aplica sobre la base que escojas, no sobre el cobro.</small></span></label></div>');
+      var ch = z.querySelector('input');
+      ch.checked = !!s.sobreBase[o.clave];
+      ch.addEventListener('change', function () {
+        if (ch.checked) s.sobreBase[o.clave] = true;
+        else { delete s.sobreBase[o.clave]; delete s.bases[o.clave]; delete s.baseDe[o.clave]; }
+        delete s.valores[o.clave];
+        K.vibrar(5); refrescar();
+      });
+      if (!ch.checked) return z;
+      var otras = basesOtras(liq);
+      var de = s.baseDe[o.clave] || (otras.length ? '' : 'manual');
+      var cs = K.nodo('<label class="op-base' + (o.faltaBase ? ' op-base--falta' : '') + '"><span>Base del ReteICA</span><select></select></label>');
+      var sl = cs.querySelector('select');
+      var opts = '<option value="">Escoge la base…</option>' +
+        otras.map(function (x) { return '<option value="' + K.esc(x.clave) + '">' + K.esc(x.nombre + ': ' + MOTOR.pesosDec(x.base)) + '</option>'; }).join('') +
+        '<option value="manual">Escribir otra base</option>';
+      sl.innerHTML = opts;
+      sl.value = de;
+      sl.addEventListener('change', function () {
+        s.baseDe[o.clave] = sl.value;
+        if (sl.value !== 'manual') delete s.bases[o.clave];
+        delete s.valores[o.clave];
+        refrescar();
+      });
+      z.appendChild(cs);
+      if (de === 'manual') { var m = campoBase(o); m.querySelector('span').innerHTML = 'Otra base <small>con decimales</small>'; z.appendChild(m); }
+      return z;
     }
 
     function editarValor(o, fila, boton) {
@@ -814,7 +862,7 @@
       if (!si) return;
       boton.disabled = true;
       var datos = { fila: c.fila, id: c.id, informe: c.informe, numero: numero, marcadas: s.marcadas, publicidad: !!s.publicidad,
-                    valores: s.valores, bases: s.bases, debito: s.debito, credito: s.credito, usarRpCesion: !!s.usarRp,
+                    valores: s.valores, bases: s.bases, sobreBase: s.sobreBase || {}, debito: s.debito, credito: s.credito, usarRpCesion: !!s.usarRp,
                     atrasada: !!s.atrasada, fechaOrden: s.atrasada ? s.fechaOrden : '', aNombre: s.aNombre || '',
                     /* 05/10 · viaja el ID, no el PDF: la orden se abre en el visor (regla de <100 KB) */
                     sinPdf: true };

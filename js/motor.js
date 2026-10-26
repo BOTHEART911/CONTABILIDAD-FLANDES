@@ -85,7 +85,9 @@
       /* 26/10 · el ReteICA se marca o desmarca A MANO con cualquier combinación: nunca automático
          (el check no se bloquea) y ninguna otra retención lo quita. Sale marcado por defecto. */
       var ica = esIca(r);
-      if (ica) { o.automatica = false; o.excluye = []; }
+      if (ica) { o.automatica = false; o.excluye = []; o.ica = true; }
+      /* 26/10 · ReteICA "Sobre base": el 0,9 % sale de una base escogida o escrita (no del cobro) */
+      if (ica && sel.sobreBase && sel.sobreBase[clave]) { o.baseTipo = 'MANUAL'; o.sobreBase = true; }
       else o.excluye = o.excluye.filter(function (k) { return k !== CODIGO_ICA && k.split('|')[0] !== CODIGO_ICA; });
       o.base = o.baseTipo === 'TRAMO' ? Math.round(Number(ctx.base) || 0) : (o.baseTipo === 'IVA' ? Math.round(cobro - cobro / (1 + iva / 100)) :
                (o.baseTipo === 'MANUAL' ? baseManual(sel.bases && sel.bases[clave]) : cobro));

@@ -2737,3 +2737,54 @@
 
 /* 10/10 · botón INFORME GERENCIAL (Mis registros): el ícono en dorado lo distingue de PDF y Excel */
 .rp-gerencial svg { color: #c99e2e; }
+
+/* ══════════ 27/10 · FUENTES DE FINANCIACIÓN ══════════ */
+/* el buscador (js/fuentes.js) */
+.op-fuentes__z { display: grid; gap: 10px; min-width: 0; }
+.op-fuentes__ob { font-size: .72rem; font-weight: 600; font-style: normal; color: var(--k-aviso); text-transform: uppercase; letter-spacing: .04em; margin-left: 6px; }
+.op-fuentes__z > .kit-btn { justify-self: start; }
+.ff { position: relative; display: grid; gap: 4px; min-width: 0; max-width: 720px; font-size: .82rem; color: var(--k-tinta-2); }
+.ff__et { font-weight: 600; }
+.ff__fila { position: relative; display: flex; min-width: 0; }
+.ff__in {
+  width: 100%; min-width: 0; min-height: 44px; padding: 9px 40px 9px 12px; font: inherit; font-size: .95rem;
+  color: var(--k-tinta); background: var(--k-papel); border: 1px solid var(--k-linea); border-radius: var(--k-r-sm);
+  text-overflow: ellipsis;
+}
+.ff__in:focus { outline: 2px solid rgba(var(--k-marca-rgb), .35); border-color: var(--k-marca); }
+.ff--lista .ff__in { font-weight: 600; }
+.ff--falta .ff__in { border-color: var(--k-aviso); background: var(--k-aviso-fondo); }
+.ff__x { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; display: grid; place-items: center;
+  border: 0; background: transparent; color: var(--k-tinta-2); border-radius: 50%; cursor: pointer; }
+.ff__x:hover, .ff__x:focus-visible { background: var(--k-papel-2); color: var(--k-tinta); }
+.ff__lista {
+  position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none;
+  max-height: min(320px, 50vh); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--k-papel); border: 1px solid var(--k-linea); border-radius: var(--k-r-sm); box-shadow: var(--k-sombra-2);
+}
+.ff__op { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: baseline; padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  color: var(--k-tinta); font-size: .88rem; line-height: 1.3; }
+.ff__op b { font-variant-numeric: tabular-nums; color: var(--k-marca); }
+.ff__op span { min-width: 0; overflow-wrap: anywhere; }
+.ff__op--act, .ff__op:hover { background: rgba(var(--k-marca-rgb), .10); }
+.ff__op[aria-selected="true"] { box-shadow: inset 3px 0 0 var(--k-marca); }
+.ff__op mark { background: rgba(var(--k-marca-rgb), .18); color: inherit; border-radius: 3px; padding: 0 1px; }
+.ff__nada { padding: 10px; color: var(--k-tinta-2); font-size: .88rem; }
+:root[data-tema="oscuro"] .ff__op b { color: var(--k-marca-clara); }
+:root[data-tema="oscuro"] .ff__op mark { background: rgba(127, 209, 168, .25); }
+
+/* la sección de Configuración */
+.cf-ff__barra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.cf-ff__busca { flex: 1 1 220px; min-width: 0; min-height: 40px; padding: 8px 10px; font: inherit; font-size: .95rem;
+  color: var(--k-tinta); background: var(--k-papel); border: 1px solid var(--k-linea); border-radius: var(--k-r-sm); }
+.cf-ff__busca:focus { outline: 2px solid rgba(var(--k-marca-rgb), .35); border-color: var(--k-marca); }
+.cf-ff__n { font-size: .82rem; color: var(--k-tinta-2); }
+.cf-ff { max-height: 520px; overflow-y: auto; padding-right: 2px; }
+.cf-ff { gap: 6px; }
+.cf-ff__cab { display: grid; grid-template-columns: 120px 1fr 40px; gap: 10px; padding: 0 11px; font-size: .75rem; font-weight: 600; color: var(--k-tinta-2); text-transform: uppercase; letter-spacing: .04em; }
+.cf-ff__fila { grid-template-columns: 120px 1fr 40px; gap: 10px; align-items: center; padding: 6px 10px; }
+.cf-ff__fila .cf-ancho { grid-column: auto; }
+.cf-ff__fila .op-campo > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.cf-ff__fila .op-campo input { min-height: 38px; }
+.cf-ff__fila--mal { border-color: var(--k-aviso); background: var(--k-aviso-fondo); }
+@media (max-width: 560px) { .cf-ff__cab { display: none; } .cf-ff__fila { grid-template-columns: 1fr 40px; } .cf-ff__fila .cf-ancho { grid-column: 1 / -1; grid-row: 2; } }

@@ -77,6 +77,7 @@
     zona.appendChild(bloqueRetenciones());
     zona.appendChild(bloqueCuentas());
     zona.appendChild(bloqueCatalogo());
+    if (CFG && CFG.motor && CFG.motor.fuentes) zona.appendChild(bloqueFuentes());   /* 27/10 */
     zona.appendChild(bloqueReglas());
   }
 
@@ -423,6 +424,91 @@
     mas.addEventListener('click', function () { extra.push({ codigo: '', nombre: '', clase: 'CREDITO' }); dibujar(); });
     var g = K.nodo('<button type="button" class="kit-btn kit-btn--marca">' + K.icono('check', 16) + ' Guardar catálogo</button>');
     g.addEventListener('click', function () { guardar('catalogo', extra, g); });
+    acc.appendChild(mas); acc.appendChild(g);
+    s.appendChild(acc);
+    return s;
+  }
+
+  /* ══════════════ FUENTES DE FINANCIACIÓN (27/10) ══════════════
+     Código y nombre. Se buscan, agregan, editan y quitan aquí mismo; nada
+     viaja hasta tocar Guardar (un solo viaje). Las órdenes ya creadas
+     guardan la fuente con el nombre de ese día: no cambian. */
+
+  function bloqueFuentes() {
+    var lista = copia(CFG.motor.fuentes || []).map(function (f, i) { return { codigo: f.codigo, nombre: f.nombre, _k: i }; });
+    var sig = lista.length;
+    var original = JSON.stringify(lista.map(function (f) { return [f.codigo, f.nombre]; }));
+    var q = '';
+    var s = seccion('moneda', 'FUENTES DE FINANCIACIÓN',
+      'Las que se escogen en cada orden de pago (una obligatoria y una segunda opcional). En la orden salen como <b>código - nombre</b> en el numeral 4. ' +
+      'Cambiar o quitar una fuente aquí no toca las órdenes ya creadas.');
+    var barra = K.nodo('<div class="cf-ff__barra"><input type="search" class="cf-ff__busca" placeholder="Buscar por código o nombre" aria-label="Buscar fuente" autocomplete="off">' +
+      '<span class="cf-ff__n" aria-live="polite"></span></div>');
+    var busca = barra.querySelector('input'), cuenta = barra.querySelector('.cf-ff__n');
+    s.appendChild(barra);
+    s.appendChild(K.nodo('<div class="cf-ff__cab" aria-hidden="true"><span>Código</span><span>Nombre</span><span></span></div>'));
+    var zona = K.nodo('<div class="cf-ret cf-ff"></div>');
+    s.appendChild(zona);
+    var aviso = K.nodo('<p class="op-nota op-nota--aviso" hidden>' + K.icono('aviso', 14) + ' Tienes cambios sin guardar en las fuentes.</p>');
+
+    function cambiado() { aviso.hidden = JSON.stringify(lista.map(function (f) { return [f.codigo, f.nombre]; })) === original; }
+
+    function fila(f) {
+      var t = K.nodo('<article class="cf-item cf-item--fila cf-ff__fila"></article>');
+      var c = entrada(f.codigo, ' inputmode="numeric" maxlength="12" placeholder="Código"');
+      var n = entrada(f.nombre, ' maxlength="120" placeholder="Nombre de la fuente"');
+      c.addEventListener('input', function () { f.codigo = c.value.replace(/\D/g, ''); c.value = f.codigo; t.classList.remove('cf-ff__fila--mal'); cambiado(); });
+      n.addEventListener('input', function () { f.nombre = n.value; t.classList.remove('cf-ff__fila--mal'); cambiado(); });
+      var x = K.nodo('<button type="button" class="kit-btn kit-btn--plano op-mini" title="Quitar esta fuente" aria-label="Quitar ' + K.esc(f.codigo || 'esta fuente') + '">' + K.icono('basura', 14) + '</button>');
+      x.addEventListener('click', function () { lista = lista.filter(function (y) { return y !== f; }); dibujar(); cambiado(); });
+      t.appendChild(campo('Código', c)); t.appendChild(campo('Nombre', n, 'cf-ancho')); t.appendChild(x);
+      f._el = t; f._c = c;
+      return t;
+    }
+
+    function dibujar() {
+      zona.innerHTML = '';
+      var ps = K.norm(q).split(/\s+/).filter(Boolean);
+      var vis = lista.filter(function (f) {
+        if (!ps.length || f._nueva) return true;
+        var tx = K.norm(f.codigo + ' ' + f.nombre);
+        return ps.every(function (p) { return tx.indexOf(p) >= 0; });
+      });
+      vis.forEach(function (f) { zona.appendChild(fila(f)); });
+      if (!vis.length) zona.appendChild(K.nodo('<p class="formulario__nota">Ninguna fuente tiene "' + K.esc(q) + '".</p>'));
+      cuenta.textContent = (vis.length !== lista.length ? vis.length + ' de ' : '') + lista.length + (lista.length === 1 ? ' fuente' : ' fuentes');
+    }
+    busca.addEventListener('input', function () { q = busca.value; dibujar(); });
+    dibujar();
+    s.appendChild(aviso);
+
+    var acc = K.nodo('<div class="ct-acc"></div>');
+    var mas = K.nodo('<button type="button" class="kit-btn kit-btn--plano">' + K.icono('mas', 16) + ' Agregar fuente</button>');
+    mas.addEventListener('click', function () {
+      var f = { codigo: '', nombre: '', _k: sig++, _nueva: true };
+      lista.unshift(f); dibujar(); cambiado();
+      if (f._c) f._c.focus();
+    });
+    var g = K.nodo('<button type="button" class="kit-btn kit-btn--marca">' + K.icono('check', 16) + ' Guardar fuentes</button>');
+    g.addEventListener('click', function () {
+      var vistos = {}, mal = null;
+      lista.forEach(function (f) {
+        if (mal) return;
+        f.nombre = String(f.nombre || '').replace(/\s+/g, ' ').trim();
+        if (!/^\d{4,12}$/.test(f.codigo || '')) mal = [f, 'El código debe tener de 4 a 12 números' + (f.nombre ? ' (' + f.nombre + ')' : '') + '.'];
+        else if (!f.nombre) mal = [f, 'La fuente ' + f.codigo + ' no tiene nombre.'];
+        else if (vistos[f.codigo]) mal = [f, 'El código ' + f.codigo + ' está repetido.'];
+        vistos[f.codigo] = 1;
+      });
+      if (!lista.length) { K.aviso('Debe quedar al menos una fuente.', 'aviso', 4000); return; }
+      if (mal) {
+        if (!mal[0]._el || !mal[0]._el.isConnected) { q = ''; busca.value = ''; dibujar(); }
+        if (mal[0]._el) { mal[0]._el.classList.add('cf-ff__fila--mal'); mal[0]._el.scrollIntoView({ block: 'center' }); mal[0]._c.focus(); }
+        K.aviso(mal[1], 'aviso', 5000);
+        return;
+      }
+      guardar('fuentes', lista.map(function (f) { return { codigo: f.codigo, nombre: f.nombre }; }), g);
+    });
     acc.appendChild(mas); acc.appendChild(g);
     s.appendChild(acc);
     return s;

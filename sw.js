@@ -46,6 +46,7 @@ var ARMAZON = [
   './js/ayuda.js',
   /* Fase 7 */
   './js/motor.js',
+  './js/fuentes.js',
   './js/ordenes.js',
   './js/registros.js',
   './js/configuracion.js',

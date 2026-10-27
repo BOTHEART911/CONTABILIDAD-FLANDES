@@ -102,6 +102,10 @@
   function cuentas() { return (LISTA && LISTA.cuentas) || []; }
   function motor() { return (LISTA && LISTA.motor) || { retenciones: [], cuentas: [], reglas: {} }; }
   function firmas() { return (LISTA && LISTA.firmas) || null; }
+  /* 27/10 · fuentes de financiación (llegan con el motor; un CORE viejo no las manda y el campo no sale) */
+  function fuentesLista() { return (LISTA && LISTA.motor && LISTA.motor.fuentes) || []; }
+  function pideFuente() { return !!(LISTA && LISTA.motor && LISTA.motor.fuentes); }
+  function fuenteDe(cod) { return fuentesLista().filter(function (f) { return f.codigo === cod; })[0] || null; }
 
   function contar() {
     var n = { total: 0, primeras: 0, cesion: 0, conPdf: 0, prioridad: 0 };
@@ -136,6 +140,13 @@
     s.publicidad = !!(sug.publicidad && sug.publicidad.marcada);
     if (c.orden) s.numero = String(parseInt(String(c.orden).slice(4), 10) || '');
     s.usarRp = !!(c.cedido && c.rpCesion && !c.rpCesionUsado);
+    /* 27/10 · la fuente de financiación de la orden anterior del contrato sale cargada (si sigue en la configuración) */
+    s.fuentes = ['', ''];
+    var hay = {};
+    fuentesLista().forEach(function (f) { hay[f.codigo] = 1; });
+    ((c.fuentesPrevias && c.fuentesPrevias.fuentes) || []).slice(0, 2).forEach(function (f, i) { if (hay[f.codigo]) s.fuentes[i] = f.codigo; });
+    if (!s.fuentes[0] && s.fuentes[1]) s.fuentes = [s.fuentes[1], ''];
+    s.segunda = !!s.fuentes[1];
     SEL[c.fila] = s;
     return s;
   }
@@ -511,7 +522,9 @@
     /* ---- el total, el movimiento y el número ---- */
     var tot = K.nodo('<section class="kit-tarjeta op-total"></section>');
     col2.appendChild(tot);
-    var mov = K.nodo('<section class="kit-tarjeta grupo op-grupo"><h3 class="grupo__t">' + K.icono('hoja', 16) + ' Movimiento financiero y contable</h3><div class="op-mov"></div>' +
+    /* 27/10 · FUENTE DE FINANCIACIÓN: obligatoria, justo antes del movimiento */
+    if (pideFuente()) zona.appendChild(tarjetaFuentes(c, s));
+    var mov =K.nodo('<section class="kit-tarjeta grupo op-grupo"><h3 class="grupo__t">' + K.icono('hoja', 16) + ' Movimiento financiero y contable</h3><div class="op-mov"></div>' +
       '<p class="op-nota">Así sale en el PDF. Débitos y créditos siempre cuadran: el crédito de la cuenta del beneficiario es el valor a girar.</p></section>');
     zona.appendChild(mov);
 
@@ -827,6 +840,48 @@
     if (C.alDetalle) C.alDetalle(c);
   }
 
+  /* ══════════════ fuente(s) de financiación (27/10) ══════════════ */
+
+  function tarjetaFuentes(c, s) {
+    var sec = K.nodo('<section class="kit-tarjeta grupo op-grupo op-fuentes"><h3 class="grupo__t">' + K.icono('moneda', 16) +
+      ' Fuente de financiación <small class="op-fuentes__ob">obligatoria</small></h3><div class="op-fuentes__z"></div></section>');
+    var z = sec.querySelector('.op-fuentes__z');
+    var prev = c.fuentesPrevias;
+    function pintar(enfocar) {
+      z.innerHTML = '';
+      var b1 = window.FUENTES.buscador({
+        lista: fuentesLista(), valor: s.fuentes[0], etiqueta: s.segunda ? 'Primera fuente' : 'Fuente',
+        excluir: function () { return s.fuentes[1]; },
+        falta: !!s.faltaFuente,
+        alCambiar: function (v) { s.fuentes[0] = v; s.faltaFuente = false; if (!v && s.fuentes[1]) { s.fuentes = [s.fuentes[1], '']; s.segunda = false; pintar(1); } }
+      });
+      z.appendChild(b1.caja);
+      sec._b1 = b1;
+      if (s.segunda) {
+        var b2 = window.FUENTES.buscador({
+          lista: fuentesLista(), valor: s.fuentes[1], etiqueta: 'Segunda fuente (opcional)',
+          excluir: function () { return s.fuentes[0]; },
+          alCambiar: function (v) { s.fuentes[1] = v; }
+        });
+        var q = K.nodo('<button type="button" class="kit-btn kit-btn--plano op-mini op-fuentes__quitar">' + K.icono('basura', 14) + ' Quitar la segunda fuente</button>');
+        q.addEventListener('click', function () { s.fuentes[1] = ''; s.segunda = false; pintar(1); });
+        z.appendChild(b2.caja);
+        z.appendChild(q);
+        if (enfocar === 2) b2.enfocar();
+      } else {
+        var mas = K.nodo('<button type="button" class="kit-btn kit-btn--plano op-mini">' + K.icono('mas', 14) + ' Agregar una segunda fuente</button>');
+        mas.addEventListener('click', function () { s.segunda = true; pintar(2); });
+        z.appendChild(mas);
+      }
+      if (enfocar === 1) b1.enfocar();
+      if (prev && prev.fuentes && prev.fuentes.length && s.fuentes[0] && prev.fuentes[0].codigo === s.fuentes[0]) {
+        z.appendChild(K.nodo('<p class="op-nota">' + K.icono('info', 14) + ' Viene de la orden de la cuenta ' + K.esc(prev.informe) + '. Puedes dejarla o cambiarla.</p>'));
+      }
+    }
+    pintar(0);
+    return sec;
+  }
+
   /* ══════════════ las acciones (una llamada cada una) ══════════════ */
 
   function crear(c, boton) {
@@ -841,6 +896,14 @@
       var ib = document.querySelector('.op-base input'); if (ib) ib.focus();
       return;
     }
+    /* 27/10 · sin fuente de financiación no hay orden */
+    if (pideFuente() && !s.fuentes[0]) {
+      s.faltaFuente = true;
+      K.aviso('Escoge la fuente de financiación de la orden.', 'aviso', 5000);
+      var fz = document.querySelector('.op-fuentes .ff');
+      if (fz) { fz.classList.add('ff--falta'); fz.scrollIntoView({ block: 'center', behavior: 'smooth' }); var fi = fz.querySelector('input'); if (fi) fi.focus({ preventScroll: true }); }
+      return;
+    }
     if (s.atrasada && !s.fechaOrden) { K.aviso('Escoge la fecha de la orden de pago atrasada.', 'aviso', 4500); var sf = document.querySelector('.op-atrasada select'); if (sf) sf.focus(); return; }
     if (!f.listo) {
       K.piezas.confirmar.avisar({ titulo: 'Faltan firmas', texto: 'Antes de crear la orden falta ' + (f.faltan || []).join(' y ') + '. Súbela en Configuración.' });
@@ -852,6 +915,8 @@
     var lista = [['Contratista', nombre(c.nombre) + ' · cuenta ' + c.informe + ' de ' + (c.total || '—')], ['Cobro', pesos(liq.cobro)]];
     liq.aplicadas.forEach(function (o) { lista.push([o.nombre + (o.editado ? ' (editado)' : ''), '− ' + pesos(o.valor)]); });
     lista.push(['Valor a girar', pesos(liq.neto)]);
+    var fsOrden = pideFuente() ? [s.fuentes[0], s.segunda ? s.fuentes[1] : ''].filter(Boolean) : [];
+    fsOrden.forEach(function (cod, i) { lista.push([fsOrden.length > 1 ? (i ? 'Segunda fuente' : 'Primera fuente') : 'Fuente de financiación', window.FUENTES.texto(fuenteDe(cod))]); });
     if (s.usarRp) lista.push(['RP de la cesión', c.rpCesion]);
     if (s.atrasada) lista.push(['Fecha (orden atrasada)', s.fechaOrden]);
     if (esc) lista.push(['A nombre de', nombre(esc.nombre)]);
@@ -864,6 +929,7 @@
       var datos = { fila: c.fila, id: c.id, informe: c.informe, numero: numero, marcadas: s.marcadas, publicidad: !!s.publicidad,
                     valores: s.valores, bases: s.bases, sobreBase: s.sobreBase || {}, debito: s.debito, credito: s.credito, usarRpCesion: !!s.usarRp,
                     atrasada: !!s.atrasada, fechaOrden: s.atrasada ? s.fechaOrden : '', aNombre: s.aNombre || '',
+                    fuentes: fsOrden,   /* 27/10 · códigos; el CORE pone el nombre */
                     /* 05/10 · viaja el ID, no el PDF: la orden se abre en el visor (regla de <100 KB) */
                     sinPdf: true };
       return K.piezas.guardado.mientras(K.pedir('crearOrden', datos, { ms: 120000 }), {

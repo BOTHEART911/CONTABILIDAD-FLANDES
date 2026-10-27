@@ -113,6 +113,7 @@
         guia: 'La orden de pago de UNA cuenta. Todo se calcula en tu teléfono al instante: marca o desmarca cada descuento, cambia un valor a mano o escoge otra cuenta contable. ' +
               '**ReteICA** (0,9 % del cobro) sale marcado y lo marcas o desmarcas tú cuando quieras: ninguna otra retención lo quita. Con **Sobre base** el 0,9 % se calcula sobre una base: escoges una de las que ya escribiste (la sigue si la cambias) o escribes otra. **Imp. a las ventas por servicios 15 %** (solo con factura electrónica): escribes el **valor base** de la factura con decimales y el descuento se redondea. ' +
               'Igual con **Honorarios persona jurídica 11 %**: al marcarla aparece su **valor base**. En esos campos el punto de miles sale solo; la coma la pones tú, solo para los centavos (ej. 4.621.848,74). ' +
+              '**Fuente de financiación** (obligatoria, antes del movimiento): escribe el código o una palabra del nombre y escoge con las flechas y Enter; puedes agregar una **segunda fuente**. Si el contrato ya tuvo fuente en una orden anterior, sale cargada. ' +
               'Las **estampillas** solo en la primera cuenta del tramo. Escribe solo los dígitos del **N° de orden** (1023 → 2026001023). ' +
               '**Orden de pago atrasada** (solo con autorización de Secretario(a) de Hacienda) deja escoger un día hábil anterior a hoy como fecha de la orden. ' +
               '**Crear orden** arma el PDF, lo guarda en la carpeta de la cuenta y lo abre en el visor (desde ahí se descarga); **Orden creada** pasa la cuenta a ORDEN DE PAGO y el contratista y Tesorería reciben el aviso en los próximos minutos.',
@@ -174,7 +175,7 @@
 
     configuracion: function () {
       return {
-        guia: 'Aquí se define cómo se liquida cada orden: las **retenciones** (código, porcentaje, sobre qué base, si es automática o solo de la primera cuenta del tramo), las **cuentas contables** por tipo de contrato, el **catálogo** de cuentas para escoger a mano y las reglas de **Régimen Simple**, **Convenio de Cooperación** e **IVA**. Cada bloque tiene su botón Guardar.',
+        guia: 'Aquí se define cómo se liquida cada orden: las **retenciones** (código, porcentaje, sobre qué base, si es automática o solo de la primera cuenta del tramo), las **cuentas contables** por tipo de contrato, el **catálogo** de cuentas para escoger a mano y las **fuentes de financiación** (código y nombre, para escoger en cada orden), las reglas de **Régimen Simple**, **Convenio de Cooperación** e **IVA**. Cada bloque tiene su botón Guardar.',
         botones: [
           { texto: '¿Qué retenciones están encendidas?', responde: function () {
               var c = CF() && CF()._cfg(); if (!c) return 'Todavía está cargando.';

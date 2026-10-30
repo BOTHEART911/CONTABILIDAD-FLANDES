@@ -106,6 +106,16 @@
   function fuentesLista() { return (LISTA && LISTA.motor && LISTA.motor.fuentes) || []; }
   function pideFuente() { return !!(LISTA && LISTA.motor && LISTA.motor.fuentes); }
   function fuenteDe(cod) { return fuentesLista().filter(function (f) { return f.codigo === cod; })[0] || null; }
+  /* 30/10 · el débito dividido en 1 a 3 fuentes (bandera del CORE: motor.partes = máximo de líneas).
+     CORE viejo sin la bandera: el campo de fuente de antes. */
+  function maxPartes() { return (LISTA && LISTA.motor && Number(LISTA.motor.partes)) || 0; }
+  function dividePartes() { return pideFuente() && maxPartes() > 1; }
+  function rpDe(c, s) { return s.usarRp && c.rpCesion ? String(c.rpCesion) : String(c.rp || ''); }
+  function cdpDe(c) { return String(c.cdp || ''); }
+  /* lo efectivo de una línea: lo editado o lo del tramo */
+  function parteCdp(c, p) { return p.cdp !== null && p.cdp !== undefined ? p.cdp : cdpDe(c); }
+  function parteRp(c, s, p) { return p.rp !== null && p.rp !== undefined ? p.rp : rpDe(c, s); }
+  function sumaPartes(s) { return (s.partes || []).reduce(function (a, p) { return a + (Number(p.valor) || 0); }, 0); }
 
   function contar() {
     var n = { total: 0, primeras: 0, cesion: 0, conPdf: 0, prioridad: 0 };
@@ -147,6 +157,20 @@
     ((c.fuentesPrevias && c.fuentesPrevias.fuentes) || []).slice(0, 2).forEach(function (f, i) { if (hay[f.codigo]) s.fuentes[i] = f.codigo; });
     if (!s.fuentes[0] && s.fuentes[1]) s.fuentes = [s.fuentes[1], ''];
     s.segunda = !!s.fuentes[1];
+    /* 30/10 · las líneas del débito: si la orden anterior se dividió, sale igual (valores si cuadran con este
+       cobro; CDP y RP editados solo si es el mismo RP del tramo). Si no, una línea con todo el cobro. */
+    s.partes = [{ valor: Math.round(c.cobro) || 0, fuente: s.fuentes[0] || '', cdp: null, rp: null }];
+    var pp = c.fuentesPrevias && c.fuentesPrevias.partes;
+    if (pp && pp.length > 1 && pp.length <= 3 && pp.every(function (p) { return hay[p.fuente]; })) {
+      var sumaP = pp.reduce(function (a, p) { return a + (Number(p.valor) || 0); }, 0);
+      var mismoRp = String(c.fuentesPrevias.rp || '') === String(c.rp || '');
+      s.partes = pp.map(function (p, i) {
+        return { valor: sumaP === Math.round(c.cobro) ? Number(p.valor) || 0 : (i ? 0 : Math.round(c.cobro) || 0), fuente: p.fuente,
+                 cdp: mismoRp && p.cdp && p.cdp !== String(c.cdp || '') ? p.cdp : null,
+                 rp: mismoRp && p.rp && p.rp !== String(c.rp || '') ? p.rp : null };
+      });
+      s.partesPrevias = { n: pp.length, informe: c.fuentesPrevias.informe, cuadran: sumaP === Math.round(c.cobro) };
+    }
     SEL[c.fila] = s;
     return s;
   }
@@ -505,6 +529,9 @@
       }
     }
     col1.appendChild(pres);
+    /* 30/10 · el débito y su(s) fuente(s) de financiación: en el espacio libre, bajo el presupuesto */
+    var partesSec = dividePartes() ? tarjetaPartes(c, s, function () { refrescar(); }) : null;
+    if (partesSec) col1.appendChild(partesSec);
 
     /* ---- descuentos ---- */
     var desc = K.nodo('<section class="kit-tarjeta grupo op-grupo op-desc"><h3 class="grupo__t">' + K.icono('check', 16) + ' Descuentos</h3>' +
@@ -523,7 +550,7 @@
     var tot = K.nodo('<section class="kit-tarjeta op-total"></section>');
     col2.appendChild(tot);
     /* 27/10 · FUENTE DE FINANCIACIÓN: obligatoria, justo antes del movimiento */
-    if (pideFuente()) zona.appendChild(tarjetaFuentes(c, s));
+    if (pideFuente() && !partesSec) zona.appendChild(tarjetaFuentes(c, s));
     var mov =K.nodo('<section class="kit-tarjeta grupo op-grupo"><h3 class="grupo__t">' + K.icono('hoja', 16) + ' Movimiento financiero y contable</h3><div class="op-mov"></div>' +
       '<p class="op-nota">Así sale en el PDF. Débitos y créditos siempre cuadran: el crédito de la cuenta del beneficiario es el valor a girar.</p></section>');
     zona.appendChild(mov);
@@ -620,7 +647,10 @@
       /* movimiento */
       var mz = mov.querySelector('.op-mov');
       var lineas = [];
-      if (liq.debito) lineas.push([liq.debito.codigo, liq.debito.nombre, liq.cobro, 0, '', '', '']);
+      /* 30/10 · con varias fuentes, una línea de débito por fuente */
+      if (liq.debito && partesSec && s.partes.length > 1) s.partes.forEach(function (p) { lineas.push([liq.debito.codigo, liq.debito.nombre, Number(p.valor) || 0, 0, '', '', '']); });
+      else if (liq.debito) lineas.push([liq.debito.codigo, liq.debito.nombre, liq.cobro, 0, '', '', '']);
+      if (partesSec) partesSec._alLiquidar(liq);
       if (liq.credito) lineas.push([liq.credito.codigo, liq.credito.nombre, 0, liq.neto, '', '', '']);
       var peso = function (o) { return o.tipo === 'Fuente' ? 0 : (o.tipo === 'I.C.A.' ? 1 : (/PROCULTURA/i.test(o.nombre) ? 2 : 3)); };
       liq.aplicadas.slice().sort(function (a, b) { return peso(a) - peso(b); }).forEach(function (o) {
@@ -882,6 +912,157 @@
     return sec;
   }
 
+  /* ══════════════ el débito dividido en fuentes (30/10) ══════════════ */
+
+  /* ¿qué le falta a las líneas? null si todo está bien; si no, { i, campo, texto } */
+  function revisarPartes(c, s, liq) {
+    var l = s.partes || [], vistos = {}, varias = l.length > 1;
+    for (var i = 0; i < l.length; i++) {
+      var p = l[i], que = varias ? ' de la línea ' + (i + 1) : '';
+      if (!p.fuente) return { i: i, campo: '.ff__in', texto: 'Escoge la fuente de financiación' + que + '.' };
+      if (vistos[p.fuente]) return { i: i, campo: '.ff__in', texto: 'La fuente de la línea ' + (i + 1) + ' ya está en otra línea: va una línea por fuente.' };
+      vistos[p.fuente] = 1;
+      if (!(Number(p.valor) > 0)) return { i: i, campo: '.op-parte__valor input', texto: 'Escribe el valor' + que + '.' };
+      if (!String(parteCdp(c, p)).trim()) return { i: i, campo: '.op-parte__cdp input', texto: 'Falta la disponibilidad (CDP)' + que + '.' };
+      if (!String(parteRp(c, s, p)).trim()) return { i: i, campo: '.op-parte__rp input', texto: 'Falta el registro (RP)' + que + '.' };
+    }
+    var suma = sumaPartes(s), cobro = Math.round(liq.cobro);
+    if (suma !== cobro) return { i: l.length - 1, campo: '.op-parte__valor input',
+      texto: 'Las líneas suman ' + pesos(suma) + ' y la cuenta cobra ' + pesos(cobro) + ' (' + (suma < cobro ? 'faltan ' : 'sobran ') + pesos(Math.abs(cobro - suma)) + '). Deben ser iguales.' };
+    return null;
+  }
+
+  function tarjetaPartes(c, s, alCambiar) {
+    var max = Math.min(3, maxPartes());
+    var sec = K.nodo('<section class="kit-tarjeta grupo op-grupo op-partes"><h3 class="grupo__t">' + K.icono('moneda', 16) +
+      ' <span class="op-partes__tit">Débito</span> <small class="op-fuentes__ob">fuente obligatoria</small></h3>' +
+      '<div class="op-partes__z"></div><div class="op-partes__pie"></div></section>');
+    var z = sec.querySelector('.op-partes__z'), pie = sec.querySelector('.op-partes__pie');
+    var debito = null, cobro = Math.round(c.cobro) || 0;
+
+    function otrasFuentes(i) { return s.partes.filter(function (p, k) { return k !== i && p.fuente; }).map(function (p) { return p.fuente; }); }
+
+    /* el pie: cuánto suman, si cuadra, y el botón de dividir */
+    function pintarPie() {
+      pie.innerHTML = '';
+      var suma = sumaPartes(s), dif = cobro - suma, varias = s.partes.length > 1;
+      if (varias) {
+        pie.appendChild(K.nodo('<p class="op-partes__suma' + (dif === 0 ? ' op-partes__suma--ok' : ' op-partes__suma--malo') + '">' +
+          K.icono(dif === 0 ? 'check' : 'aviso', 14) + '<span>Suman <b>' + K.esc(pesos(suma)) + '</b> de <b>' + K.esc(pesos(cobro)) + '</b>' +
+          (dif === 0 ? ' · cuadra' : ' · ' + (dif > 0 ? 'faltan ' : 'sobran ') + K.esc(pesos(Math.abs(dif))) + '. Así no se puede crear la orden.') + '</span></p>'));
+      }
+      if (s.partes.length < max) {
+        var mas = K.nodo('<button type="button" class="kit-btn kit-btn--plano op-mini">' + K.icono('mas', 14) + ' Dividir en otra fuente</button>');
+        mas.addEventListener('click', function () {
+          var resto = cobro - sumaPartes(s);
+          s.partes.push({ valor: resto > 0 ? resto : 0, fuente: '', cdp: null, rp: null });
+          pintar(s.partes.length - 1);
+          alCambiar();
+        });
+        pie.appendChild(mas);
+      }
+      if (s.partesPrevias && varias) {
+        pie.appendChild(K.nodo('<p class="op-nota">' + K.icono('info', 14) + ' La orden de la cuenta ' + K.esc(s.partesPrevias.informe) + ' se dividió en ' +
+          s.partesPrevias.n + ' fuentes' + (s.partesPrevias.cuadran ? '. Revisa los valores.' : ' con otro cobro: ajusta los valores.') + '</p>'));
+      }
+    }
+
+    function linea(p, i) {
+      var varias = s.partes.length > 1;
+      var caja = K.nodo('<div class="op-parte"><div class="op-parte__cab"><b>' + K.esc(debito ? debito.codigo + ' · ' + debito.nombre : 'Débito') + '</b>' +
+        (varias ? '<span class="op-parte__n">' + (i + 1) + ' de ' + s.partes.length + '</span>' : '') + '</div></div>');
+      /* valor: con una sola línea es todo el cobro (no se edita) */
+      if (!varias) {
+        p.valor = cobro;
+        caja.appendChild(K.nodo('<div class="op-parte__valor op-parte__valor--fijo"><span>Valor</span><b>' + K.esc(pesos(cobro)) + '</b></div>'));
+      } else {
+        var lv = K.nodo('<label class="op-campo op-parte__valor"><span>Valor</span><div class="op-parte__vfila"><input inputmode="numeric" autocomplete="off" placeholder="$ 0"></div></label>');
+        var iv = lv.querySelector('input');
+        iv.value = p.valor ? Number(p.valor).toLocaleString('es-CO') : '';
+        /* el blur también avisa: solo se repinta si el valor cambió (si no, el repintado del pie
+           cambia el botón Crear orden en medio del toque y el primer toque se pierde) */
+        K.pesosEnVivo(iv, function (d) {
+          var nv = d ? Number(d) : 0;
+          if (nv === (Number(p.valor) || 0)) return;
+          p.valor = nv; caja.classList.remove('op-parte--falta'); pintarPie(); pintarResto(); alCambiar();
+        });
+        var resto = K.nodo('<button type="button" class="kit-btn kit-btn--plano op-mini op-parte__resto" hidden></button>');
+        resto.addEventListener('click', function () {
+          var otras = s.partes.reduce(function (a, q, k) { return a + (k === i ? 0 : Number(q.valor) || 0); }, 0);
+          p.valor = Math.max(0, cobro - otras);
+          iv.value = p.valor ? p.valor.toLocaleString('es-CO') : '';
+          pintarPie(); pintarResto(); alCambiar();
+        });
+        lv.querySelector('.op-parte__vfila').appendChild(resto);
+        caja._resto = function () {
+          var otras = s.partes.reduce(function (a, q, k) { return a + (k === i ? 0 : Number(q.valor) || 0); }, 0);
+          var debe = cobro - otras;
+          resto.hidden = sumaPartes(s) === cobro || !(debe > 0);
+          resto.textContent = 'Poner ' + pesos(debe);
+        };
+        caja.appendChild(lv);
+      }
+      var b = window.FUENTES.buscador({
+        lista: fuentesLista(), valor: p.fuente, etiqueta: 'Fuente de financiación',
+        excluir: function () { return otrasFuentes(i); },
+        falta: !!s.faltaFuente && !p.fuente,
+        alCambiar: function (v) { p.fuente = v; s.faltaFuente = false; caja.classList.remove('op-parte--falta'); if (i === 0) s.fuentes[0] = v; }
+      });
+      caja.appendChild(b.caja);
+      caja._b = b;
+      /* CDP y RP: los del tramo (o el RP de la cesión); se pueden editar y lo editado sale en la orden */
+      var pres = K.nodo('<div class="op-parte__pres">' +
+        '<label class="op-campo op-parte__cdp"><span>Disponibilidad (CDP)</span><input inputmode="numeric" autocomplete="off" maxlength="40"></label>' +
+        '<label class="op-campo op-parte__rp"><span>Registro (RP)</span><input inputmode="numeric" autocomplete="off" maxlength="40"></label></div>');
+      var ic = pres.querySelector('.op-parte__cdp input'), ir = pres.querySelector('.op-parte__rp input');
+      function marca(inp, editado) { inp.parentNode.classList.toggle('op-parte__ed', !!editado); inp.title = editado ? 'Editado: así sale en la orden' : 'El del tramo'; }
+      ic.value = parteCdp(c, p); ir.value = parteRp(c, s, p);
+      marca(ic, p.cdp !== null && p.cdp !== undefined); marca(ir, p.rp !== null && p.rp !== undefined);
+      ic.addEventListener('input', function () { var v = ic.value.trim(); p.cdp = v === cdpDe(c) ? null : v; marca(ic, p.cdp !== null); caja.classList.remove('op-parte--falta'); });
+      ir.addEventListener('input', function () { var v = ir.value.trim(); p.rp = v === rpDe(c, s) ? null : v; marca(ir, p.rp !== null); caja.classList.remove('op-parte--falta'); });
+      caja._defaults = function () { if (p.cdp === null || p.cdp === undefined) ic.value = cdpDe(c); if (p.rp === null || p.rp === undefined) ir.value = rpDe(c, s); };
+      caja.appendChild(pres);
+      if (varias) {
+        var q = K.nodo('<button type="button" class="kit-btn kit-btn--plano op-mini op-parte__quitar">' + K.icono('basura', 14) + ' Quitar esta línea</button>');
+        q.addEventListener('click', function () {
+          s.partes.splice(i, 1);
+          if (s.partes.length === 1) s.partes[0].valor = cobro;
+          s.fuentes[0] = s.partes[0].fuente || '';
+          pintar(-1);
+          alCambiar();
+        });
+        caja.appendChild(q);
+      }
+      return caja;
+    }
+
+    var cajas = [];
+    function pintarResto() { cajas.forEach(function (k) { if (k._resto) k._resto(); }); }
+    function pintar(enfocar) {
+      z.innerHTML = '';
+      cajas = s.partes.map(linea);
+      cajas.forEach(function (k) { z.appendChild(k); });
+      pintarPie(); pintarResto();
+      if (enfocar >= 0 && cajas[enfocar]) {
+        var iv = cajas[enfocar].querySelector('.op-parte__valor input');
+        if (iv && !s.partes[enfocar].valor) iv.focus(); else cajas[enfocar]._b.enfocar();
+      }
+    }
+    /* cada vez que se liquida: la cuenta del débito (puede cambiar) y el RP de la cesión */
+    sec._alLiquidar = function (liq) {
+      var d = liq.debito ? { codigo: liq.debito.codigo, nombre: liq.debito.nombre } : null;
+      if (cobro !== Math.round(liq.cobro)) cobro = Math.round(liq.cobro);
+      if (!debito || !d || debito.codigo !== d.codigo) {
+        debito = d;
+        sec.querySelector('.op-partes__tit').textContent = d ? 'Débito · ' + d.nombre : 'Débito';
+        cajas.forEach(function (k) { var b0 = k.querySelector('.op-parte__cab b'); if (b0) b0.textContent = d ? d.codigo + ' · ' + d.nombre : 'Débito'; });
+      }
+      cajas.forEach(function (k) { k._defaults(); });
+    };
+    pintar(-1);
+    return sec;
+  }
+
   /* ══════════════ las acciones (una llamada cada una) ══════════════ */
 
   function crear(c, boton) {
@@ -896,8 +1077,20 @@
       var ib = document.querySelector('.op-base input'); if (ib) ib.focus();
       return;
     }
+    /* 30/10 · las líneas del débito: fuente, valor, CDP y RP en cada una, y la suma igual al cobro */
+    if (dividePartes()) {
+      var malP = revisarPartes(c, s, liq);
+      if (malP) {
+        K.aviso(malP.texto, 'aviso', 6500);
+        var zp = document.querySelectorAll('.op-parte')[malP.i];
+        var foco = zp && zp.querySelector(malP.campo);
+        if (zp) { zp.classList.add('op-parte--falta'); zp.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+        if (foco) foco.focus({ preventScroll: true });
+        return;
+      }
+    }
     /* 27/10 · sin fuente de financiación no hay orden */
-    if (pideFuente() && !s.fuentes[0]) {
+    else if (pideFuente() && !s.fuentes[0]) {
       s.faltaFuente = true;
       K.aviso('Escoge la fuente de financiación de la orden.', 'aviso', 5000);
       var fz = document.querySelector('.op-fuentes .ff');
@@ -915,8 +1108,16 @@
     var lista = [['Contratista', nombre(c.nombre) + ' · cuenta ' + c.informe + ' de ' + (c.total || '—')], ['Cobro', pesos(liq.cobro)]];
     liq.aplicadas.forEach(function (o) { lista.push([o.nombre + (o.editado ? ' (editado)' : ''), '− ' + pesos(o.valor)]); });
     lista.push(['Valor a girar', pesos(liq.neto)]);
-    var fsOrden = pideFuente() ? [s.fuentes[0], s.segunda ? s.fuentes[1] : ''].filter(Boolean) : [];
-    fsOrden.forEach(function (cod, i) { lista.push([fsOrden.length > 1 ? (i ? 'Segunda fuente' : 'Primera fuente') : 'Fuente de financiación', window.FUENTES.texto(fuenteDe(cod))]); });
+    var partesOrden = dividePartes() ? s.partes.map(function (p) {
+      return { valor: Number(p.valor) || 0, fuente: p.fuente, cdp: String(parteCdp(c, p)).trim(), rp: String(parteRp(c, s, p)).trim() };
+    }) : null;
+    var fsOrden = partesOrden ? partesOrden.map(function (p) { return p.fuente; })
+                              : (pideFuente() ? [s.fuentes[0], s.segunda ? s.fuentes[1] : ''].filter(Boolean) : []);
+    if (partesOrden) partesOrden.forEach(function (p, i) {
+      lista.push([(partesOrden.length > 1 ? 'Fuente ' + (i + 1) : 'Fuente de financiación') + ' · ' + window.FUENTES.texto(fuenteDe(p.fuente)),
+                  pesos(p.valor) + ' · CDP ' + p.cdp + ' · RP ' + p.rp]);
+    });
+    else fsOrden.forEach(function (cod, i) { lista.push([fsOrden.length > 1 ? (i ? 'Segunda fuente' : 'Primera fuente') : 'Fuente de financiación', window.FUENTES.texto(fuenteDe(cod))]); });
     if (s.usarRp) lista.push(['RP de la cesión', c.rpCesion]);
     if (s.atrasada) lista.push(['Fecha (orden atrasada)', s.fechaOrden]);
     if (esc) lista.push(['A nombre de', nombre(esc.nombre)]);
@@ -930,6 +1131,7 @@
                     valores: s.valores, bases: s.bases, sobreBase: s.sobreBase || {}, debito: s.debito, credito: s.credito, usarRpCesion: !!s.usarRp,
                     atrasada: !!s.atrasada, fechaOrden: s.atrasada ? s.fechaOrden : '', aNombre: s.aNombre || '',
                     fuentes: fsOrden,   /* 27/10 · códigos; el CORE pone el nombre */
+                    partes: partesOrden || undefined,   /* 30/10 · valor, fuente, CDP y RP de cada línea del débito */
                     /* 05/10 · viaja el ID, no el PDF: la orden se abre en el visor (regla de <100 KB) */
                     sinPdf: true };
       return K.piezas.guardado.mientras(K.pedir('crearOrden', datos, { ms: 120000 }), {

@@ -2788,3 +2788,29 @@
 .cf-ff__fila .op-campo input { min-height: 38px; }
 .cf-ff__fila--mal { border-color: var(--k-aviso); background: var(--k-aviso-fondo); }
 @media (max-width: 560px) { .cf-ff__cab { display: none; } .cf-ff__fila { grid-template-columns: 1fr 40px; } .cf-ff__fila .cf-ancho { grid-column: 1 / -1; grid-row: 2; } }
+
+/* ══════════════ 30/10 · el débito dividido en fuentes (Liquidar orden, columna izquierda) ══════════════ */
+.op-partes__z { display: grid; gap: 10px; min-width: 0; }
+.op-parte { display: grid; gap: 8px; min-width: 0; padding: 10px 12px; border: 1px solid var(--k-linea); border-left: 3px solid var(--k-marca); border-radius: var(--k-r-md); background: var(--k-papel); }
+.op-parte--falta { border-color: var(--k-aviso); border-left-color: var(--k-aviso); background: var(--k-aviso-fondo); }
+.op-parte__cab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; font-size: .86rem; color: var(--k-tinta); }
+.op-parte__cab b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.op-parte__n { flex: 0 0 auto; font-size: .74rem; font-weight: 700; color: var(--k-marca); background: rgba(var(--k-marca-rgb), .08); border-radius: 999px; padding: 1px 8px; }
+:root[data-tema="oscuro"] .op-parte__n { color: var(--k-marca-clara); }
+.op-parte__valor--fijo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: .82rem; color: var(--k-tinta-2); }
+.op-parte__valor--fijo span { font-weight: 600; }
+.op-parte__valor--fijo b { font-size: 1.05rem; color: var(--k-tinta); font-variant-numeric: tabular-nums; }
+.op-parte__vfila { display: flex; gap: 8px; align-items: center; min-width: 0; flex-wrap: wrap; }
+.op-parte__vfila input { flex: 1 1 140px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.op-parte__pres { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; min-width: 0; }
+.op-parte__pres input { font-variant-numeric: tabular-nums; }
+.op-parte__ed > span::after { content: ' · editado'; font-weight: 500; color: var(--k-aviso); }
+.op-parte__ed input { border-color: var(--k-aviso); }
+.op-parte__quitar { justify-self: start; }
+.op-partes__pie { display: grid; gap: 6px; margin-top: 8px; }
+.op-partes__pie > .kit-btn { justify-self: start; }
+.op-partes__suma { display: flex; gap: 6px; align-items: flex-start; margin: 0; padding: 8px 10px; border-radius: var(--k-r-sm); font-size: .86rem; font-variant-numeric: tabular-nums; }
+.op-partes__suma svg { flex: 0 0 auto; margin-top: 2px; }
+.op-partes__suma--ok { color: var(--k-ok); background: var(--k-ok-fondo); }
+.op-partes__suma--malo { color: var(--k-malo); background: var(--k-malo-fondo); }
+.op-partes .ff { max-width: none; }

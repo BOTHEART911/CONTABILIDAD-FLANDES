@@ -55,7 +55,7 @@
   }
 
   /**
-   * op = { lista: [{codigo, nombre}], valor: 'codigo', excluir: function () { return 'codigo' },
+   * op = { lista: [{codigo, nombre}], valor: 'codigo', excluir: function () { return 'codigo' | ['codigo', …] },
    *        alCambiar: function (codigo|''), etiqueta, ayuda, placeholder, falta: bool }
    * Devuelve { caja, input, enfocar, valor, falta(bool) }.
    */
@@ -88,7 +88,8 @@
       var fuera = op.excluir ? op.excluir() : '';
       var q = inp.value;
       if (actual && q === texto(actual)) q = '';     /* abrir sobre lo escogido muestra todo */
-      vistas = filtrar(lista.filter(function (f) { return f.codigo !== fuera; }), q);
+      /* 30/10 · excluir puede devolver un código o una lista (las otras líneas del débito) */
+      vistas = filtrar(lista.filter(function (f) { return fuera instanceof Array ? fuera.indexOf(f.codigo) < 0 : f.codigo !== fuera; }), q);
       ul.innerHTML = '';
       if (!vistas.length) {
         ul.appendChild(K.nodo('<li class="ff__nada" role="option" aria-disabled="true">Ninguna fuente tiene "' + K.esc(inp.value) + '"</li>'));

@@ -335,6 +335,20 @@
     return m.join('');
   }
 
+  /* 17/11 · el contrato ya tiene configurada la 1.ª o la 2.ª adición, pero esta cuenta todavía es del
+     contrato inicial (o de la adición anterior): su RP es el del tramo, no el de la adición nueva.
+     Con la primera cuenta de la adición (tramo de esa adición) el aviso desaparece solo. */
+  function rpNuevoAun(c) {
+    if (!c || c.error) return false;
+    if (c.tramo === 'PRIMARIO') return Number(c.adicion1) > 0 || Number(c.adicion2) > 0;
+    if (c.tramo === '1RA ADICION') return Number(c.adicion2) > 0;
+    return false;
+  }
+  function avisoRp(c) {
+    return '<p class="op-rpaun" title="Esta cuenta todavía es del ' + (c.tramo === 'PRIMARIO' ? 'contrato inicial' : 'tramo de la 1ª adición') +
+      ': usa el RP de ese tramo">' + K.icono('aviso', 13) + ' Aún no usar nuevo RP</p>';
+  }
+
   function tarjeta(c) {
     var liq = liquidar(c);
     var t = K.nodo('<article class="kit-tarjeta ct-t op-t' + (c.primera ? ' op-t--primera' : '') + '"></article>');
@@ -359,6 +373,7 @@
     t.appendChild(K.nodo('<div class="op-neto"><span>Descuentos <b>' + K.esc(pesos(liq.retenido)) + '</b></span>' +
       '<span class="op-neto__v">A girar <b>' + K.esc(pesos(liq.neto)) + '</b></span></div>'));
     t.appendChild(K.nodo('<div class="ct-t__marcas">' + marcasDe(c) + '</div>'));
+    if (rpNuevoAun(c)) t.appendChild(K.nodo(avisoRp(c)));
 
     var a = K.nodo('<div class="ct-acc"></div>');
     var liqB = K.nodo('<button type="button" class="kit-btn kit-btn--marca ct-acc__ver">' + K.icono('moneda', 16) + (c.urlOrden ? ' Revisar la orden' : ' Liquidar') + '</button>');
@@ -514,6 +529,7 @@
     var pres = K.nodo('<section class="kit-tarjeta grupo op-grupo"><h3 class="grupo__t">' + K.icono('documento', 16) + ' Presupuesto de este tramo</h3>' +
       '<dl class="op-valores"><div><dt>Disponibilidad (CDP)</dt><dd>' + K.esc(c.cdp || '—') + '</dd></div>' +
       '<div><dt>Registro (RP)</dt><dd class="op-rp">' + K.esc(c.rp || '—') + '</dd></div></dl></section>');
+    if (rpNuevoAun(c)) pres.appendChild(K.nodo(avisoRp(c)));
     if (c.cedido) {
       if (c.rpCesion && !c.rpCesionUsado) {
         var rpc = K.nodo('<label class="op-check op-check--rp"><input type="checkbox"><span><b>Usar RP Cesión</b> ' + K.esc(c.rpCesion) +

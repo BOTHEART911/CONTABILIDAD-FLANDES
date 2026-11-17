@@ -2814,3 +2814,8 @@
 .op-partes__suma--ok { color: var(--k-ok); background: var(--k-ok-fondo); }
 .op-partes__suma--malo { color: var(--k-malo); background: var(--k-malo-fondo); }
 .op-partes .ff { max-width: none; }
+
+/* 17/11 · «Aún no usar nuevo RP»: la cuenta todavía es del tramo anterior a la adición configurada.
+   Con los tokens del kit: el modo oscuro sale solo. */
+.op-rpaun { display: inline-flex; align-items: center; gap: 6px; margin: 6px 0 0; padding: 4px 10px; border-radius: var(--k-r-pill); font: 700 12px/1.3 var(--k-fuente); color: var(--k-aviso); background: var(--k-aviso-fondo); }
+.op-rpaun svg { flex: 0 0 auto; }

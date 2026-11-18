@@ -313,19 +313,65 @@
 
   /* ---------- inicio ---------- */
 
+  /* 18/11/2026 · NUEVO INICIO (igual que CONTRATISTA, DESIGN.md del kit).
+     Títulos en frase normal, un ícono propio del kit por acción y la
+     tarea principal del rol arriba, grande, con su conteo. No cambia
+     permisos, conteos ni viajes: solo cómo se ve. */
+  var ICONO_INI = {
+    'REVISAR CUENTAS': 'lapiz', 'PLAN DE PAGOS': 'moneda', 'INFORMES FIRMADOS': 'archivo', 'REPORTE': 'pdf',
+    'MIS REGISTROS': 'descargar', 'AGENDA DE REVISIÓN': 'calendario', 'MI CALIDAD COMO PRIMER FILTRO': 'estrella',
+    'CALIDAD DEL PRIMER FILTRO': 'estrella', 'CONTRATISTAS': 'persona', 'DESCARGAR INFORME': 'documento',
+    'REQUERIMIENTOS': 'enviar', 'SOLICITUD A COMUNICACIONES': 'camara', 'COMUNICADOS': 'megafono',
+    'DRIVE DE HACIENDA': 'nube', 'IR A SECOP II': 'globo', 'DIRECTORIO INSTITUCIONAL': 'ubicacion', 'DIRECTORIO': 'ubicacion',
+    'MI FIRMA Y MI FOTO': 'imagen', 'AGREGAR CONTRATISTA': 'mas', 'CARGA MASIVA': 'hoja', 'SOLICITUDES': 'comentario',
+    'ÓRDENES DE PAGO': 'moneda', 'CONFIGURACIÓN': 'herramienta', 'EGRESOS PENDIENTES': 'reloj', 'EGRESOS EMITIDOS': 'check',
+    'CUENTAS PAGADAS': 'moneda', 'NUEVA SOLICITUD': 'mas', 'REPARTIR': 'intercambiar', 'SOLICITANTES EXTERNOS': 'persona',
+    'SOPORTE': 'salvavidas', 'SOPORTES': 'salvavidas', 'ASISTENTE DE AYUDA': 'robot', 'BITÁCORA · MIS REGISTROS': 'archivo',
+    'CUENTAS ATRASADAS': 'vencido', 'MANTENIMIENTO': 'candado', 'MENSAJES Y AVISOS': 'sobre', 'MI BOT': 'whatsapp',
+    'RECORDATORIOS': 'campana', 'TABLERO DE RENDIMIENTO': 'velocimetro', 'TABLERO DEL ECOSISTEMA': 'grafica',
+    'TUTORIALES EN VIDEO': 'play', 'USUARIOS Y ROLES': 'llave'
+  };
+  var PALABRA_INI = { secop: 'SECOP', ii: 'II', pdf: 'PDF', dian: 'DIAN', sia: 'SIA', drive: 'Drive', hacienda: 'Hacienda', whatsapp: 'WhatsApp' };
+  /* "IR A SECOP II" → "Ir a SECOP II" */
+  function frase(t) {
+    return String(t || '').toLowerCase().split(/(\s+)/).map(function (w, i) {
+      if (PALABRA_INI[w]) return PALABRA_INI[w];
+      return i ? w : w.charAt(0).toUpperCase() + w.slice(1);
+    }).join('');
+  }
+  /* "OSCAR MAURICIO" → "Oscar Mauricio" */
+  function capNombre(n) {
+    var chicas = { de: 1, del: 1, la: 1, las: 1, los: 1, y: 1 };
+    return String(n || '').toLowerCase().split(/(\s+)/).map(function (w, i) {
+      return (i && chicas[w]) ? w : w.charAt(0).toUpperCase() + w.slice(1);
+    }).join('');
+  }
+  /* la tarea principal del rol sale de su bloque y va arriba, grande */
+  function iniPrincipal(caja, el) {
+    if (!el) return;
+    var bloqueViejo = el.closest('.bloque');
+    el.classList.add('acceso--principal');
+    var s = K.nodo('<section class="ini2-hero" aria-label="Tu trabajo de hoy"></section>');
+    s.appendChild(el);
+    var saludo = caja.querySelector('.saludo');
+    var ref = saludo ? saludo.nextSibling : caja.firstChild;
+    while (ref && ref.nodeType === 1 && ref.classList.contains('rv-aviso')) ref = ref.nextSibling;
+    caja.insertBefore(s, ref || null);
+    if (bloqueViejo && !bloqueViejo.querySelector('.acceso')) bloqueViejo.hidden = true;
+  }
+
   function vistaInicio() {
-    var caja = K.nodo('<div class="kit-ancho vista"></div>');
+    var caja = K.nodo('<div class="kit-ancho vista ini2"></div>');
     var saludo = K.nodo(
       '<section class="saludo">' +
       '  <div class="saludo__txt">' +
       '    <p class="saludo__hola">' + K.esc(saludoDelDia()) + ',</p>' +
-      '    <h2 class="saludo__nombre">' + K.esc(nombreCorto(YO.nombre)) + '</h2>' +
+      '    <h2 class="saludo__nombre">' + K.esc(capNombre(nombreCorto(YO.nombre))) + '</h2>' +
       '    <p class="saludo__doc">' + K.esc(rolLegible(YO.rol)) + ' · ' + K.esc(fechaHumana(new Date())) + '</p>' +
       '  </div>' +
       '</section>'
     );
     if (K.piezas.perfil && K.piezas.personas) saludo.appendChild(caraPerfil());
-    if (K.piezas.cielo) K.piezas.cielo.poner(saludo, { burbujas: 3 });
     caja.appendChild(saludo);
 
     /* la firma: sin ella no sale la orden (el aviso llega con el arranque, sin otro viaje) */
@@ -343,7 +389,7 @@
 
     function bloque(titulo, tarjetas) {
       var s = K.nodo('<section class="bloque" aria-label="' + K.esc(titulo) + '">' +
-        '<h3 class="bloque__t">' + K.esc(titulo) + '</h3></section>');
+        '<h3 class="bloque__t">' + K.esc(frase(titulo)) + '</h3></section>');
       var r = K.nodo('<div class="kit-rejilla kit-rejilla--auto accesos"></div>');
       tarjetas.forEach(function (t) { r.appendChild(t); });
       s.appendChild(r);
@@ -386,11 +432,12 @@
 
     var destino = K.nodo('<section class="resumen"></section>');
     if (accOrd) {
-      var sRes = K.nodo('<section class="bloque" aria-label="Resumen de órdenes"><h3 class="bloque__t">RESUMEN DE ÓRDENES POR HACER</h3></section>');
+      var sRes = K.nodo('<section class="bloque" aria-label="Resumen de órdenes"><h3 class="bloque__t">Resumen de órdenes por hacer</h3></section>');
       sRes.appendChild(destino);
       caja.appendChild(sRes);
     }
 
+    iniPrincipal(caja, accOrd);
     app.appendChild(caja);
     K.piezas.creditos.montar(caja);
 
@@ -456,9 +503,9 @@
   function acceso(titulo, texto, medio, al) {
     var b = K.nodo(
       '<button type="button" class="kit-tarjeta acceso">' +
-      '  <img class="acceso__img" src="' + K.esc(K.medio(medio)) + '" alt="" loading="lazy">' +
+      '  <span class="acceso__img acceso__img--icono" aria-hidden="true">' + K.icono(ICONO_INI[titulo] || 'documento', 40) + '</span>' +
       '  <span class="acceso__txt">' +
-      '    <span class="acceso__t">' + K.esc(titulo) + '</span>' +
+      '    <span class="acceso__t">' + K.esc(frase(titulo)) + '</span>' +
       '    <span class="acceso__p">' + K.esc(texto) + '</span>' +
       '  </span>' +
       '</button>'
@@ -472,9 +519,9 @@
   function accesoIcono(titulo, texto, icono, al) {
     var b = K.nodo(
       '<button type="button" class="kit-tarjeta acceso">' +
-      '  <span class="acceso__img acceso__img--icono" aria-hidden="true">' + K.icono(icono, 40) + '</span>' +
+      '  <span class="acceso__img acceso__img--icono" aria-hidden="true">' + K.icono(ICONO_INI[titulo] || icono, 40) + '</span>' +
       '  <span class="acceso__txt">' +
-      '    <span class="acceso__t">' + K.esc(titulo) + '</span>' +
+      '    <span class="acceso__t">' + K.esc(frase(titulo)) + '</span>' +
       '    <span class="acceso__p">' + K.esc(texto) + '</span>' +
       '  </span>' +
       '</button>'

@@ -115,7 +115,45 @@
   /* lo efectivo de una línea: lo editado o lo del tramo */
   function parteCdp(c, p) { return p.cdp !== null && p.cdp !== undefined ? p.cdp : cdpDe(c); }
   function parteRp(c, s, p) { return p.rp !== null && p.rp !== undefined ? p.rp : rpDe(c, s); }
-  function sumaPartes(s) { return (s.partes || []).reduce(function (a, p) { return a + (Number(p.valor) || 0); }, 0); }
+  /* 18/11 · el valor de cada fuente lleva centavos (2.592.877,57): las cuentas se hacen en centavos
+     enteros para que 2.592.877,57 + 407.122,43 dé 3.000.000 exacto (sin el error de los decimales) */
+  function cts(v) { return Math.round((Number(v) || 0) * 100); }
+  function deCts(n) { return Math.round(n) / 100; }
+  function pesosC(v) { return '$ ' + MOTOR.pesosDec(v); }
+  function sumaPartes(s) { return deCts((s.partes || []).reduce(function (a, p) { return a + cts(p.valor); }, 0)); }
+
+  /* 18/11 · el campo del valor de una fuente: puntos de miles solos mientras se escribe y la coma
+     para los centavos (máximo 2), igual que el Valor base. Un punto tecleado sin coma se toma como
+     la coma (teclados de teléfono). alCambiar(valor) recibe el número con sus centavos. */
+  function centavosEnVivo(inp, alCambiar) {
+    function pintar() {
+      var crudo = inp.value, pos = inp.selectionStart || 0;
+      var antes = crudo.slice(0, pos).replace(/[^\d,]/g, '').length;
+      var limpio = crudo.replace(/[^\d,]/g, '');
+      var k = limpio.indexOf(',');
+      var ent = (k >= 0 ? limpio.slice(0, k) : limpio).replace(/^0+(?=\d)/, '');
+      var dec = k >= 0 ? limpio.slice(k + 1).replace(/,/g, '').slice(0, 2) : null;
+      if (k >= 0 && !ent) { ent = '0'; antes++; }
+      var miles = '';
+      while (ent.length > 3) { miles = '.' + ent.slice(-3) + miles; ent = ent.slice(0, -3); }
+      inp.value = ent + miles + (dec === null ? '' : ',' + dec);
+      var p = 0, vistos = 0;
+      while (p < inp.value.length && vistos < antes) { if (/[\d,]/.test(inp.value[p])) vistos++; p++; }
+      try { if (document.activeElement === inp) inp.setSelectionRange(p, p); } catch (e) { /* algunos tipos de campo no dejan */ }
+      if (typeof alCambiar === 'function') alCambiar(MOTOR.baseManual(inp.value));
+    }
+    inp.addEventListener('beforeinput', function (e) {
+      if (e.data === '.' && inp.value.indexOf(',') < 0) {
+        e.preventDefault();
+        var a = inp.selectionStart || 0, b = inp.selectionEnd || a;
+        inp.setRangeText(',', a, b, 'end');
+        pintar();
+      }
+    });
+    inp.addEventListener('input', pintar);
+    inp.addEventListener('blur', pintar);
+    inp.addEventListener('paste', function () { setTimeout(pintar, 0); });
+  }
 
   function contar() {
     var n = { total: 0, primeras: 0, cesion: 0, conPdf: 0, prioridad: 0 };
@@ -162,14 +200,14 @@
     s.partes = [{ valor: Math.round(c.cobro) || 0, fuente: s.fuentes[0] || '', cdp: null, rp: null }];
     var pp = c.fuentesPrevias && c.fuentesPrevias.partes;
     if (pp && pp.length > 1 && pp.length <= 3 && pp.every(function (p) { return hay[p.fuente]; })) {
-      var sumaP = pp.reduce(function (a, p) { return a + (Number(p.valor) || 0); }, 0);
+      var sumaP = pp.reduce(function (a, p) { return a + cts(p.valor); }, 0);   /* 18/11 · en centavos */
       var mismoRp = String(c.fuentesPrevias.rp || '') === String(c.rp || '');
       s.partes = pp.map(function (p, i) {
-        return { valor: sumaP === Math.round(c.cobro) ? Number(p.valor) || 0 : (i ? 0 : Math.round(c.cobro) || 0), fuente: p.fuente,
+        return { valor: sumaP === cts(Math.round(c.cobro)) ? deCts(cts(p.valor)) : (i ? 0 : Math.round(c.cobro) || 0), fuente: p.fuente,
                  cdp: mismoRp && p.cdp && p.cdp !== String(c.cdp || '') ? p.cdp : null,
                  rp: mismoRp && p.rp && p.rp !== String(c.rp || '') ? p.rp : null };
       });
-      s.partesPrevias = { n: pp.length, informe: c.fuentesPrevias.informe, cuadran: sumaP === Math.round(c.cobro) };
+      s.partesPrevias = { n: pp.length, informe: c.fuentesPrevias.informe, cuadran: sumaP === cts(Math.round(c.cobro)) };
     }
     SEL[c.fila] = s;
     return s;
@@ -674,8 +712,8 @@
       });
       mz.innerHTML = '<div class="op-tabla" role="table"><div class="op-tabla__f op-tabla__cab" role="row"><span>Cuenta</span><span>Nombre de la cuenta</span><span>Débito</span><span>Crédito</span><span>Tipo</span><span>Base</span><span>%</span></div>' +
         lineas.map(function (l) {
-          return '<div class="op-tabla__f" role="row"><span>' + K.esc(l[0]) + '</span><span>' + K.esc(l[1]) + '</span><span>' + K.esc(K.numero(l[2])) +
-            '</span><span>' + K.esc(K.numero(l[3])) + '</span><span>' + K.esc(l[4]) + '</span><span>' + (l[5] ? K.esc(l[7] ? MOTOR.pesosDec(l[5]) : K.numero(l[5])) : '') + '</span><span>' + K.esc(l[6]) + '</span></div>';
+          return '<div class="op-tabla__f" role="row"><span>' + K.esc(l[0]) + '</span><span>' + K.esc(l[1]) + '</span><span>' + K.esc(MOTOR.pesosDec(l[2])) +
+            '</span><span>' + K.esc(MOTOR.pesosDec(l[3])) + '</span><span>' + K.esc(l[4]) + '</span><span>' + (l[5] ? K.esc(l[7] ? MOTOR.pesosDec(l[5]) : K.numero(l[5])) : '') + '</span><span>' + K.esc(l[6]) + '</span></div>';
         }).join('') +
         '<div class="op-tabla__f op-tabla__tot" role="row"><span></span><span>Totales</span><span>' + K.esc(K.numero(liq.cobro)) + '</span><span>' + K.esc(K.numero(liq.cobro)) +
         '</span><span class="op-tabla__girar">A girar <b>' + K.esc(pesos(liq.neto)) + '</b></span></div></div>';
@@ -942,9 +980,9 @@
       if (!String(parteCdp(c, p)).trim()) return { i: i, campo: '.op-parte__cdp input', texto: 'Falta la disponibilidad (CDP)' + que + '.' };
       if (!String(parteRp(c, s, p)).trim()) return { i: i, campo: '.op-parte__rp input', texto: 'Falta el registro (RP)' + que + '.' };
     }
-    var suma = sumaPartes(s), cobro = Math.round(liq.cobro);
-    if (suma !== cobro) return { i: l.length - 1, campo: '.op-parte__valor input',
-      texto: 'Las líneas suman ' + pesos(suma) + ' y la cuenta cobra ' + pesos(cobro) + ' (' + (suma < cobro ? 'faltan ' : 'sobran ') + pesos(Math.abs(cobro - suma)) + '). Deben ser iguales.' };
+    var suma = sumaPartes(s), cobro = Math.round(liq.cobro), dc = cts(cobro) - cts(suma);
+    if (dc !== 0) return { i: l.length - 1, campo: '.op-parte__valor input',
+      texto: 'Las líneas suman ' + pesosC(suma) + ' y la cuenta cobra ' + pesosC(cobro) + ' (' + (dc > 0 ? 'faltan ' : 'sobran ') + pesosC(deCts(Math.abs(dc))) + '). Deben ser iguales.' };
     return null;
   }
 
@@ -961,17 +999,17 @@
     /* el pie: cuánto suman, si cuadra, y el botón de dividir */
     function pintarPie() {
       pie.innerHTML = '';
-      var suma = sumaPartes(s), dif = cobro - suma, varias = s.partes.length > 1;
+      var suma = sumaPartes(s), dif = cts(cobro) - cts(suma), varias = s.partes.length > 1;   /* 18/11 · dif en centavos */
       if (varias) {
         pie.appendChild(K.nodo('<p class="op-partes__suma' + (dif === 0 ? ' op-partes__suma--ok' : ' op-partes__suma--malo') + '">' +
-          K.icono(dif === 0 ? 'check' : 'aviso', 14) + '<span>Suman <b>' + K.esc(pesos(suma)) + '</b> de <b>' + K.esc(pesos(cobro)) + '</b>' +
-          (dif === 0 ? ' · cuadra' : ' · ' + (dif > 0 ? 'faltan ' : 'sobran ') + K.esc(pesos(Math.abs(dif))) + '. Así no se puede crear la orden.') + '</span></p>'));
+          K.icono(dif === 0 ? 'check' : 'aviso', 14) + '<span>Suman <b>' + K.esc(pesosC(suma)) + '</b> de <b>' + K.esc(pesosC(cobro)) + '</b>' +
+          (dif === 0 ? ' · cuadra' : ' · ' + (dif > 0 ? 'faltan ' : 'sobran ') + K.esc(pesosC(deCts(Math.abs(dif)))) + '. Así no se puede crear la orden.') + '</span></p>'));
       }
       if (s.partes.length < max) {
         var mas = K.nodo('<button type="button" class="kit-btn kit-btn--plano op-mini">' + K.icono('mas', 14) + ' Dividir en otra fuente</button>');
         mas.addEventListener('click', function () {
-          var resto = cobro - sumaPartes(s);
-          s.partes.push({ valor: resto > 0 ? resto : 0, fuente: '', cdp: null, rp: null });
+          var resto = cts(cobro) - cts(sumaPartes(s));
+          s.partes.push({ valor: resto > 0 ? deCts(resto) : 0, fuente: '', cdp: null, rp: null });
           pintar(s.partes.length - 1);
           alCambiar();
         });
@@ -992,29 +1030,29 @@
         p.valor = cobro;
         caja.appendChild(K.nodo('<div class="op-parte__valor op-parte__valor--fijo"><span>Valor</span><b>' + K.esc(pesos(cobro)) + '</b></div>'));
       } else {
-        var lv = K.nodo('<label class="op-campo op-parte__valor"><span>Valor</span><div class="op-parte__vfila"><input inputmode="numeric" autocomplete="off" placeholder="$ 0"></div></label>');
+        /* 18/11 · acepta centavos con la coma: 2.592.877,57 */
+        var lv = K.nodo('<label class="op-campo op-parte__valor"><span>Valor <small>con centavos</small></span><div class="op-parte__vfila"><input inputmode="decimal" autocomplete="off" placeholder="Ej: 2.592.877,57"></div></label>');
         var iv = lv.querySelector('input');
-        iv.value = p.valor ? Number(p.valor).toLocaleString('es-CO') : '';
+        iv.value = p.valor ? MOTOR.pesosDec(p.valor) : '';
         /* el blur también avisa: solo se repinta si el valor cambió (si no, el repintado del pie
            cambia el botón Crear orden en medio del toque y el primer toque se pierde) */
-        K.pesosEnVivo(iv, function (d) {
-          var nv = d ? Number(d) : 0;
-          if (nv === (Number(p.valor) || 0)) return;
-          p.valor = nv; caja.classList.remove('op-parte--falta'); pintarPie(); pintarResto(); alCambiar();
+        centavosEnVivo(iv, function (nv) {
+          if (cts(nv) === cts(p.valor)) return;
+          p.valor = deCts(cts(nv)); caja.classList.remove('op-parte--falta'); pintarPie(); pintarResto(); alCambiar();
         });
         var resto = K.nodo('<button type="button" class="kit-btn kit-btn--plano op-mini op-parte__resto" hidden></button>');
         resto.addEventListener('click', function () {
-          var otras = s.partes.reduce(function (a, q, k) { return a + (k === i ? 0 : Number(q.valor) || 0); }, 0);
-          p.valor = Math.max(0, cobro - otras);
-          iv.value = p.valor ? p.valor.toLocaleString('es-CO') : '';
+          var otras = s.partes.reduce(function (a, q, k) { return a + (k === i ? 0 : cts(q.valor)); }, 0);
+          p.valor = deCts(Math.max(0, cts(cobro) - otras));
+          iv.value = p.valor ? MOTOR.pesosDec(p.valor) : '';
           pintarPie(); pintarResto(); alCambiar();
         });
         lv.querySelector('.op-parte__vfila').appendChild(resto);
         caja._resto = function () {
-          var otras = s.partes.reduce(function (a, q, k) { return a + (k === i ? 0 : Number(q.valor) || 0); }, 0);
-          var debe = cobro - otras;
-          resto.hidden = sumaPartes(s) === cobro || !(debe > 0);
-          resto.textContent = 'Poner ' + pesos(debe);
+          var otras = s.partes.reduce(function (a, q, k) { return a + (k === i ? 0 : cts(q.valor)); }, 0);
+          var debe = cts(cobro) - otras;
+          resto.hidden = cts(sumaPartes(s)) === cts(cobro) || !(debe > 0);
+          resto.textContent = 'Poner ' + pesosC(deCts(debe));
         };
         caja.appendChild(lv);
       }
@@ -1125,13 +1163,13 @@
     liq.aplicadas.forEach(function (o) { lista.push([o.nombre + (o.editado ? ' (editado)' : ''), '− ' + pesos(o.valor)]); });
     lista.push(['Valor a girar', pesos(liq.neto)]);
     var partesOrden = dividePartes() ? s.partes.map(function (p) {
-      return { valor: Number(p.valor) || 0, fuente: p.fuente, cdp: String(parteCdp(c, p)).trim(), rp: String(parteRp(c, s, p)).trim() };
+      return { valor: deCts(cts(p.valor)), fuente: p.fuente, cdp: String(parteCdp(c, p)).trim(), rp: String(parteRp(c, s, p)).trim() };   /* 18/11 · con centavos */
     }) : null;
     var fsOrden = partesOrden ? partesOrden.map(function (p) { return p.fuente; })
                               : (pideFuente() ? [s.fuentes[0], s.segunda ? s.fuentes[1] : ''].filter(Boolean) : []);
     if (partesOrden) partesOrden.forEach(function (p, i) {
       lista.push([(partesOrden.length > 1 ? 'Fuente ' + (i + 1) : 'Fuente de financiación') + ' · ' + window.FUENTES.texto(fuenteDe(p.fuente)),
-                  pesos(p.valor) + ' · CDP ' + p.cdp + ' · RP ' + p.rp]);
+                  pesosC(p.valor) + ' · CDP ' + p.cdp + ' · RP ' + p.rp]);
     });
     else fsOrden.forEach(function (cod, i) { lista.push([fsOrden.length > 1 ? (i ? 'Segunda fuente' : 'Primera fuente') : 'Fuente de financiación', window.FUENTES.texto(fuenteDe(cod))]); });
     if (s.usarRp) lista.push(['RP de la cesión', c.rpCesion]);

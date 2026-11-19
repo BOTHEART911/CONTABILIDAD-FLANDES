@@ -328,6 +328,7 @@
     function pintar() {
       repintarPastillas();
       var filas = cuentas().filter(function (c) { return pasa(c); });
+      if (K.piezas.prioridad) filas = K.piezas.prioridad.primero(filas);   /* 19/11 · cuenta prioritaria primero (kit/pastillas.js) */
       var tot = cuentas().length;
       conteo.innerHTML = '<b>' + K.numero(filas.length) + '</b> ' + (filas.length === 1 ? 'cuenta' : 'cuentas') +
         (filas.length !== tot ? ' <span>de ' + tot + '</span>' : '') +

@@ -407,7 +407,7 @@
       (c.adicion1 ? '  <div><dt>1ª adición</dt><dd>' + K.esc(pesos(c.adicion1)) + '</dd></div>' : '') +
       (c.adicion2 ? '  <div><dt>2ª adición</dt><dd>' + K.esc(pesos(c.adicion2)) + '</dd></div>' : '') +
       '  <div><dt>Radicada</dt><dd' + (dias !== null && dias >= 5 ? ' class="rv-t__tarde"' : '') + '>' + K.esc(c.radicada || '—') +
-      (dias !== null ? ' <small>· hace ' + dias + (dias === 1 ? ' día' : ' días') + '</small>' : '') + '</dd></div>' +
+      (K.piezas.prioridad && K.piezas.prioridad.hace ? K.piezas.prioridad.hace(c, c.radicada) : (dias !== null ? ' <small>· hace ' + dias + (dias === 1 ? ' día' : ' días') + '</small>' : '')) + '</dd></div>' +
       '</dl>'));
     t.appendChild(K.nodo('<div class="op-neto"><span>Descuentos <b>' + K.esc(pesos(liq.retenido)) + '</b></span>' +
       '<span class="op-neto__v">A girar <b>' + K.esc(pesos(liq.neto)) + '</b></span></div>'));

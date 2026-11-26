@@ -119,7 +119,7 @@
       var cc = K.nodo('<div class="rp-fila__c"></div>');
       cc.appendChild(K.nodo('<p class="rp-fila__n">' + K.esc(K.pesos(x.cobro)) + (x.desde ? ' <small>· ' + K.esc(O.fecha(x.desde)) + ' al ' + K.esc(O.fecha(x.hasta)) + '</small>' : '') + '</p>'));
       cc.appendChild(K.nodo('<p class="rp-fila__d">' + (x.radicada ? 'Radicada ' + K.esc(O.fecha(x.radicada)) : 'Sin radicar') +
-        ' · saldo después ' + K.esc(K.pesos(x.nuevo)) + (x.planilla ? ' · planilla ' + K.esc(x.planilla) : '') + '</p>'));
+        ' · saldo después ' + K.esc(K.pesos(x.nuevo)) + (x.planilla ? ' · planilla ' + K.esc(x.planilla) + (x.planEmp && x.planEmp.planEmp ? ' (de empleados, sin base de cotización)' : '') : '') + '</p>'));
       var pago = [];
       if (x.orden) pago.push('Orden ' + x.orden + (x.fechaOrden ? ' (' + O.fecha(x.fechaOrden) + ')' : ''));
       if (x.egreso) pago.push('Egreso ' + x.egreso + (x.fechaEgreso ? ' (' + O.fecha(x.fechaEgreso) + ')' : ''));
